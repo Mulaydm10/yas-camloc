@@ -20,3 +20,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - `camloc/evaluate.py` + `groundtruth.py` (eval only): official metric reimplemented and cross-checked, breakdown by GT quality, lane, sector, speed, lap.
 - `camloc/run.py`: single entry point MCAP -> CSV with per-frame timing; `hold` estimator only (smoke).
 - 8 pytest tests green. LOCKED `tests/README.md` still says "no baseline": needs the Main Agent to update it.
+
+## 2026-10-17 06:19 CEST - Claude (Opus) - D2: odometry, EKF, map priors, ego-body masks (EXP-0003, EXP-0004)
+- `camloc/odometry.py` + `tools/calibrate_odometry.py` (training-only, GT): params in `camloc/assets/odometry.json`.
+- `camloc/filter.py`: PoseEKF (x, y, yaw) with track-coordinate measurements; straights-only map priors.
+- Masks: automatic extraction (temporal std, median frame difference) failed at night (noise-dominated); hand polygons on mean images in `camloc/assets/body_polygons.json`, rendered by `tools/make_masks.py`.
+- Results: allowed-only 55.1 m, ambiguous 13.8 m whole-run RMSE. 12 tests green.

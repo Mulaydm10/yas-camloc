@@ -17,6 +17,8 @@ import numpy as np
 
 from . import config as C
 from .data import FrameSet, Replay, StateEvent, initial_pose, load_static
+from .filter import PoseEKF
+from .odometry import Odometry
 from .track import TrackModel
 
 
@@ -42,10 +44,52 @@ class HoldEstimator(Estimator):
         return self.x, self.y, self.yaw
 
 
-ESTIMATORS = {'hold': HoldEstimator}
+class OdomEstimator(Estimator):
+    """EKF driven by car-state odometry; optional track-bounds constraint (D2). No cameras yet."""
+    source, bounds = 'wheels', False
+
+    def __init__(self, init, cameras, track):
+        super().__init__(init, cameras, track)
+        self.odo = Odometry(source=self.source)
+        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'])
+        self.t = self.t0
+
+    def _advance(self, t_ns):
+        if t_ns > self.t:
+            self.ekf.predict((t_ns - self.t) / 1e9, self.odo.v, self.odo.wz)
+            self.t = t_ns
+
+    def on_state(self, ev):
+        self._advance(ev.stamp_ns)          # zero-order hold of the previous sample's (v, wz)
+        self.odo.update(ev.stamp_ns, ev.fields)
+
+    def on_frames(self, fs):
+        self._advance(fs.stamp_ns)
+        if self.bounds:
+            self.ekf.constrain_to_lane(self.track)
+        return self.ekf.pose
+
+
+class OdomBounds(OdomEstimator):
+    bounds = True
+
+
+class OdomEst(OdomEstimator):
+    source = 'estimator'
+
+
+class OdomEstBounds(OdomEstimator):
+    source, bounds = 'estimator', True
+
+
+ESTIMATORS = {'hold': HoldEstimator, 'odom': OdomEstimator, 'odom_bounds': OdomBounds,
+              'odom_est': OdomEst, 'odom_est_bounds': OdomEstBounds}
+NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds'}
 
 
 def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=None, cams=C.CAMS):
+    if estimator in NEEDS_AMBIGUOUS and state != 'ambiguous':
+        raise SystemExit(f'{estimator} uses fused estimator fields: pass --state ambiguous (rules question Q1)')
     cameras, bounds = load_static(mcap, cams)
     track = TrackModel(bounds)
     init = initial_pose(mcap)

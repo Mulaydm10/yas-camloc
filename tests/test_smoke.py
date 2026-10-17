@@ -59,8 +59,8 @@ def test_lane_roundtrip_on_circle():
 
 def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
-    eval_only = {'groundtruth.py', 'evaluate.py'}
-    for f in pkg.glob('*.py'):
+    eval_only = {'groundtruth.py', 'evaluate.py', 'calibrate_odometry.py'}   # evaluation / training-time only
+    for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue
         src = f.read_text()
@@ -119,3 +119,63 @@ def test_end_to_end_hold_matches_official_evaluator(tmp_path):
     off = official({k: v[(gt['t'] >= w[0][0]) & (gt['t'] <= w[0][1])] for k, v in gt.items()}, sub)
     m = re.search(r'position RMSE\s+\[m\]\s+([\d.]+)', off)
     assert abs(float(m.group(1)) - res['all']['pos_rmse']) < 1e-3
+
+
+# ------------------------------------------------------------------ D2: odometry + filter + masks
+
+def test_ekf_straight_line_and_covariance_growth():
+    from camloc.filter import PoseEKF
+    q = {'sigma_v_frac': 0.04, 'sigma_wz': 0.01, 'sigma_v_abs': 0.2}
+    f = PoseEKF(0, 0, 0, q)
+    for _ in range(100):
+        f.predict(0.01, 20.0, 0.0)
+    assert abs(f.X[0] - 20.0) < 1e-9 and abs(f.X[1]) < 1e-9
+    assert f.P[1, 1] > f.P[0, 0] * 0.01 and np.all(np.linalg.eigvalsh(f.P) > 0)
+
+
+def test_lane_constraint_pulls_back_inside_on_a_straight():
+    from camloc.filter import PoseEKF
+    from camloc.track import TrackModel
+    x = np.linspace(0, 2000, 2001)
+    bounds = {'track_left': np.c_[x, np.full_like(x, 6.0)], 'track_right': np.c_[x, np.full_like(x, -6.0)],
+              'pitlane_left': np.c_[x[:500], np.full(500, -40.0)], 'pitlane_right': np.c_[x[:500], np.full(500, -44.0)]}
+    # an open straight "track": close the ring far away so TrackModel accepts it
+    ring = lambda p, r: np.vstack([p, p[::-1] + [0, r]])
+    bounds['track_left'], bounds['track_right'] = ring(bounds['track_left'], 200), ring(bounds['track_right'], 220)
+    tm = TrackModel(bounds)
+    lane = tm.track
+    s0 = 1000.0
+    xx, yy, hh = lane.to_xy(s0, 9.0)            # 3 m outside a 6 m half-width (driving direction irrelevant)
+    f = PoseEKF(xx[0], yy[0], hh[0] + np.radians(4), {'sigma_v_frac': 0.04, 'sigma_wz': 0.01, 'sigma_v_abs': 0.2},
+                p0=(3.0, 3.0, np.radians(5)))
+    name, applied = f.constrain_to_lane(tm)
+    assert applied and name == 'track'
+    _, n, e = lane.project(f.X[0], f.X[1], f.X[2])
+    assert abs(n[0]) < 7.5 and abs(np.degrees(e[0])) < 4
+
+
+def test_masks_cover_expected_regions():
+    from camloc.tools.make_masks import load_masks
+    m = load_masks()
+    assert m['r'].all() and m['rl'].all()                         # no body visible
+    for c in ('fr', 'cl', 'cr', 'rr'):
+        assert not m[c][-1].any() and m[c][0, 600:900].all()      # bottom row = body, top-centre = scene
+
+
+@needs_data
+def test_odometry_params_and_streaming_matches_batch():
+    from camloc.odometry import Odometry, batch
+    import json
+    p = json.loads((C.ROOT / 'camloc' / 'assets' / 'odometry.json').read_text())
+    assert 0.29 < p['r'] < 0.32 and 3.0 < p['L'] < 4.5
+    from camloc.data import Replay, StateEvent
+    ev = [e for e in Replay(cams=(), start_s=600, duration_s=2) if isinstance(e, StateEvent)]
+    o = Odometry(p)
+    vs, ws = [], []
+    for e in ev:
+        o.update(e.stamp_ns, e.fields)
+        vs.append(o.v); ws.append(o.wz)
+    t = np.array([e.stamp_ns for e in ev])
+    F = {k: np.array([e.fields[k] for e in ev]) for k in ev[0].fields}
+    v, wz = batch(t, F, p)
+    assert np.allclose(vs, v) and np.max(np.abs(np.array(ws)[60:] - wz[60:])) < 0.02

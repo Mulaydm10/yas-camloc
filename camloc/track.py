@@ -91,6 +91,12 @@ class Lane:
         if side < 0:
             self.w_left, self.w_right = self.w_right, self.w_left
         self._tree = cKDTree(self.xy)
+        # "straight" = |curvature| < 1/500 m everywhere within +-100 m. There, the lane heading and width do
+        # not depend on s, so map priors stay valid even with a large along-track error.
+        from scipy.ndimage import maximum_filter1d
+        win = int(round(100 / max(np.median(self.seg_len), 1e-3)))
+        kmax = maximum_filter1d(np.abs(self.kappa), size=2 * win + 1, mode='wrap' if self.closed else 'nearest')
+        self.straight = kmax < 1 / 500
 
     # ------------------------------------------------------------------ geometry
     def project(self, x, y, yaw=None):
@@ -157,6 +163,9 @@ class Lane:
         h = self.heading_at(s)
         n = np.broadcast_to(n, x.shape)
         return x - np.sin(h) * n, y + np.cos(h) * n, wrap(h + epsi)
+
+    def straight_at(self, s):
+        return self._interp(s, self.straight.astype(float)) > 0.5
 
     def inside(self, s, n, margin=0.0):
         wl, wr = self.width_at(s)

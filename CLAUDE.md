@@ -27,7 +27,10 @@ Stack: Python 3.12 (ADR-0002). Dataset in `data/` (git-ignored; download steps i
 ```bash
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt   # setup
 .venv/bin/python -m pytest -q tests                                     # smoke tests (dataset tests skip without data)
-.venv/bin/python -m camloc.run --out cache/sub.csv [--estimator hold] [--start S --duration S]   # MCAP -> submission CSV
+.venv/bin/python -m camloc.run --out cache/sub.csv [--estimator odom_bounds] [--start S --duration S]   # MCAP -> submission CSV
+#   estimators: hold | odom | odom_bounds (allowed signals only) | odom_est[_bounds] (needs --state ambiguous, rules Q1)
+.venv/bin/python -m camloc.tools.calibrate_odometry   # training-time fit (uses GT) -> camloc/assets/odometry.json
+.venv/bin/python -m camloc.tools.make_masks           # ego-body masks from camloc/assets/body_polygons.json
 .venv/bin/python -m camloc.evaluate cache/sub.csv [--laps 4] [--official]   # metrics + sector/speed/lane/lap breakdown
 ```
 Rule: inference code never imports `camloc.groundtruth` / `camloc.evaluate` (enforced by `tests/test_smoke.py`).

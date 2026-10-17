@@ -1,0 +1,25 @@
+{
+ "r": 0.3051508977688721,
+ "wheel_mode": "antislip",
+ "L": 3.688088206050045,
+ "K": 9.636964015304059e-05,
+ "delta0": 0.0012972462826951333,
+ "lag_s": 0.02,
+ "q": {
+  "sigma_v_frac": 0.036828105455357765,
+  "sigma_wz": 0.01142870271908086,
+  "sigma_v_abs": 0.2
+ },
+ "fit": {
+  "speed_rmse_mps": 0.21489035415662472,
+  "wz_rmse_radps": 0.010254850609683388,
+  "drift_10s": {
+   "n_windows": 138,
+   "lon_rmse_m": 2.4616914019676526,
+   "lat_rmse_m": 3.558310187866027,
+   "yaw_rmse_deg": 2.070711371619894,
+   "pos_rmse_m": 4.326834403070289
+  },
+  "note": "fitted on the training run with GT (training-time calibration)"
+ }
+}
