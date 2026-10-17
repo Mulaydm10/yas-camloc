@@ -123,6 +123,16 @@ def main():
               'sigma_v_abs': 0.2}
     p['fit'] = {'speed_rmse_mps': report['speed'][best_mode]['rmse_mps'], 'wz_rmse_radps': best[0],
                 'drift_10s': dr, 'note': 'fitted on the training run with GT (training-time calibration)'}
+    # sideslip: travel direction - heading vs lateral acceleration (GT), applied in the EKF prediction (EXP-0020)
+    vx, vy = np.convolve(np.gradient(gx, ts), k, 'same'), np.convolve(np.gradient(gy, ts), k, 'same')
+    beta_gt = np.angle(np.exp(1j * (np.arctan2(vy, vx) - gyaw)))
+    sm = moving & lap_mask
+    A = np.c_[np.ones(sm.sum()), (vv * ww)[sm]]
+    (b0, b1), *_ = np.linalg.lstsq(A, beta_gt[sm], rcond=None)
+    p['beta0'], p['beta1'] = float(b0), float(b1)
+    report['sideslip'] = {'beta0_deg': float(np.degrees(b0)), 'beta1_deg_per_mps2': float(np.degrees(b1)),
+                          'resid_std_deg': float(np.degrees(np.std(beta_gt[sm] - A @ [b0, b1]))),
+                          'raw_std_deg': float(np.degrees(np.std(beta_gt[sm])))}
     PARAMS.parent.mkdir(parents=True, exist_ok=True)
     PARAMS.write_text(json.dumps(p, indent=1))
     (C.CACHE / 'odometry_calibration.json').write_text(json.dumps(report, indent=1))

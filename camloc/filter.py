@@ -30,11 +30,12 @@ class PoseEKF:
         self.P[3, 3] = self.P[2, 2]
 
     # --------------------------------------------------------------- prediction
-    def predict(self, dt, v, wz):
+    def predict(self, dt, v, wz, beta=0.0):
+        """beta: sideslip, the travel direction is heading + beta."""
         if dt <= 0:
             return
         x, y, h = self.X[:3]
-        hm = h + 0.5 * wz * dt
+        hm = h + 0.5 * wz * dt + beta
         c, s = np.cos(hm), np.sin(hm)
         self.X[:3] = [x + v * c * dt, y + v * s * dt, wrap(h + wz * dt)]
         F = np.eye(4)

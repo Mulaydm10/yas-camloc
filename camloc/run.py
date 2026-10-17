@@ -49,6 +49,9 @@ class HoldEstimator(Estimator):
 class OdomEstimator(Estimator):
     """EKF driven by car-state odometry; optional track-bounds constraint (D2). No cameras yet."""
     source, bounds = 'wheels', False
+    # sideslip in the prediction (odometry.Odometry.beta, EXP-0020/0021): gains on the fitted constant and
+    # lateral-acceleration terms; 0 = plain unicycle
+    BETA0_GAIN, BETA1_GAIN = 0.0, 0.0
 
     def __init__(self, init, cameras, track):
         super().__init__(init, cameras, track)
@@ -61,7 +64,9 @@ class OdomEstimator(Estimator):
             self.t = t_ns
             return
         if t_ns > self.t:
-            self.ekf.predict((t_ns - self.t) / 1e9, self.odo.v, self.odo.wz)
+            p = self.odo.p
+            beta = self.BETA0_GAIN * p.get('beta0', 0.0) + self.BETA1_GAIN * p.get('beta1', 0.0) * self.odo.v * self.odo.wz
+            self.ekf.predict((t_ns - self.t) / 1e9, self.odo.v, self.odo.wz, float(np.clip(beta, -0.07, 0.07)))
             self.t = t_ns
 
     def on_state(self, ev):
@@ -219,7 +224,7 @@ class VisualMapLoc(VisualHeading):
     MAP_CAMS = ('fr', 'r', 'fl')
     VMAP = C.ASSETS / 'vmap.npz'
     SIGMA_XY, SIGMA_YAW = 0.6, np.radians(0.4)       # held-out lap 4: median 0.3-0.66 m, 0.17-0.29 deg
-    MIN_INL_SINGLE = 18      # a lone camera fix needs this many PnP inliers (30 -> 18: held-out laps pooled 1.06 -> 0.81 m, EXP-0015)
+    MIN_INL_SINGLE = 30      # a lone camera fix needs this many PnP inliers (18 helped the plain map, EXP-0015; with the CLAHE map 30 is better: pooled 0.775 -> 0.673 m, EXP-0020)
     AGREE_M = 2.0
 
     def __init__(self, init, cameras, track):
@@ -264,10 +269,19 @@ class VisualMapLoc(VisualHeading):
         # a lone fix far outside the filter's uncertainty is more likely a wrong place match
         use = [f for f in use if len(use) >= 2 or np.hypot(f['x'] - x, f['y'] - y) < 3 * sd + 8]
         if use:
-            mx, my = np.mean([f['x'] for f in use]), np.mean([f['y'] for f in use])
-            myaw = float(np.angle(np.mean([np.exp(1j * f['yaw']) for f in use])))
-            k = len(use)
-            sxy, syaw = self.SIGMA_XY / np.sqrt(k), self.SIGMA_YAW / np.sqrt(k)
+            if self.QUALITY_W:
+                # per-fix sigma from its quality: fewer inliers / larger reprojection RMS -> less weight
+                q = np.array([np.sqrt(self.Q_REF_INL / max(f['n'], 1)) * max(1.0, f['rms_px'] / self.Q_REF_RMS)
+                              for f in use])
+                w = 1 / q ** 2
+                mx, my = np.sum(w * [f['x'] for f in use]) / w.sum(), np.sum(w * [f['y'] for f in use]) / w.sum()
+                myaw = float(np.angle(np.sum(w * np.exp(1j * np.array([f['yaw'] for f in use])))))
+                sxy, syaw = self.SIGMA_XY / np.sqrt(w.sum()), self.SIGMA_YAW / np.sqrt(w.sum())
+            else:
+                mx, my = np.mean([f['x'] for f in use]), np.mean([f['y'] for f in use])
+                myaw = float(np.angle(np.mean([np.exp(1j * f['yaw']) for f in use])))
+                k = len(use)
+                sxy, syaw = self.SIGMA_XY / np.sqrt(k), self.SIGMA_YAW / np.sqrt(k)
             # statistical consistency (NIS, 2-D position) once the filter is confident; repeated consistent
             # rejections mean the FILTER is wrong, so after REJECT_RESET in a row the fix is accepted anyway
             Sxy = self.ekf.P[:2, :2] + np.eye(2) * sxy ** 2
@@ -295,6 +309,8 @@ class VisualMapLoc(VisualHeading):
             return True
         return self.FIX_PERIOD_S > 0 and ((t_ns - self.t0_stress) / 1e9) % self.FIX_PERIOD_S >= self.FIX_PERIOD_S - self.FIX_GAP_S
 
+    # fix quality weighting (EXP-0021): sigma_i = SIGMA_XY * sqrt(Q_REF_INL / inliers) * max(1, rms / Q_REF_RMS)
+    QUALITY_W, Q_REF_INL, Q_REF_RMS = 0, 40.0, 1.5
     NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
     REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again
 
@@ -308,10 +324,16 @@ class VisualHeadingEst(VisualHeading):
     source = 'estimator'
 
 
+class VisualMapLocEst(VisualMapLoc):
+    """vismap with the fused state_estimation speed / yaw rate in the prediction step (ADR-0003: the brief
+    allows car-state data; pose-derived fields stay forbidden and are never exposed by the replay)."""
+    source = 'estimator'
+
+
 ESTIMATORS = {'hold': HoldEstimator, 'odom': OdomEstimator, 'odom_bounds': OdomBounds,
               'odom_est': OdomEst, 'odom_est_bounds': OdomEstBounds, 'vis': VisualHeading, 'vis_est': VisualHeadingEst,
-              'vismap': VisualMapLoc}
-NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds', 'vis_est'}
+              'vismap': VisualMapLoc, 'vismap_est': VisualMapLocEst}
+NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds', 'vis_est', 'vismap_est'}
 
 
 def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=None, cams=C.CAMS, overrides=None,

@@ -21,5 +21,7 @@
    "pos_rmse_m": 4.326834403070289
   },
   "note": "fitted on the training run with GT (training-time calibration)"
- }
+ },
+ "beta0": 0.003998294813340462,
+ "beta1": 0.0024304982986215547
 }
