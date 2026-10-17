@@ -23,3 +23,5 @@ analysis/out/
 # camera frames from the dataset (licence: no upload) - regenerate with analysis/*.py
 analysis/montage_*.png
 analysis/body_mask.png
+cache/
+.pytest_cache/

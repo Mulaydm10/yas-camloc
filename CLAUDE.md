@@ -23,7 +23,14 @@ Append-only: `worklog.md`, `experiments/experiment_log.md`, `research/*`.
 Reference IDs in commits, worklog entries and STATE rows.
 
 ## Canonical commands
-TODO(<owner>): stack is undecided (see `ADR-0002`, `Q-0003`). Whoever resolves the ADR fills this section in **and** lands a green smoke test in the **same change**. Do not invent commands.
+Stack: Python 3.12 (ADR-0002). Dataset in `data/` (git-ignored; download steps in `analysis/README.md`).
+```bash
+uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt   # setup
+.venv/bin/python -m pytest -q tests                                     # smoke tests (dataset tests skip without data)
+.venv/bin/python -m camloc.run --out cache/sub.csv [--estimator hold] [--start S --duration S]   # MCAP -> submission CSV
+.venv/bin/python -m camloc.evaluate cache/sub.csv [--laps 4] [--official]   # metrics + sector/speed/lane/lap breakdown
+```
+Rule: inference code never imports `camloc.groundtruth` / `camloc.evaluate` (enforced by `tests/test_smoke.py`).
 
 ## Hard rules
 1. Concurrency, claims and escalation: follow `AGENTS.md`.

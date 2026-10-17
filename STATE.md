@@ -6,6 +6,7 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 ## Done
 - Repo scaffolded (ADR-0001).
 - Dataset analysis for the Constructor Labs camloc challenge: `REPORT.md`, scripts in `analysis/`, venv `.venv` (Python 3.12).
+- D1 done: `camloc/` package (causal replay, track+pit model, eval harness, run script), ADR-0002 accepted, 8 tests green (EXP-0002).
 
 ## In flight
 - (none)
@@ -13,13 +14,14 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 ## Blocked
 - Event facts unknown: fill `COMPETITION.md` (Q-0002).
 - Thesis unknown: fill `VISION.md` (Q-0001).
-- Stack undecided: ADR-0002 / Q-0003.
+- `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row.
+- Rules: which state_estimation fields are allowed (REPORT.md §9 Q1). Default: allowed-only.
 
 ## Next intended step
-Get the organisers to answer the rules question (REPORT.md §9, Q1: which state_estimation fields are allowed). Fill `COMPETITION.md` from `notes/brief/*.pdf`. Then D1 of the first-week plan in REPORT.md §9.
+Get the organisers to answer the rules question (REPORT.md §9, Q1: which state_estimation fields are allowed). Fill `COMPETITION.md` from `notes/brief/*.pdf`. Then D2 of the plan in REPORT.md §9: wheel/bicycle predictor in (s, n, psi) as an EKF + per-camera ego-body masks.
 
 ## Latest experiment
-none (see `experiments/experiment_log.md`)
+EXP-0002: D1 pipeline smoke (hold estimator, harness == official)
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |

@@ -6,3 +6,5 @@
 | Q-0002 | 2026-10-16 | Event facts: deadline+timezone, rubric, format, rules. Fill COMPETITION.md | TODO(<owner>) | Open | |
 | Q-0003 | 2026-10-16 | Which stack? See ADR-0002 | TODO(<owner>) | Open | |
 | Q-0004 | 2026-10-16 | Which idea do we build? See ideas/candidates.md | TODO(<owner>) | Open | |
+
+- 2026-10-17 06:06 CEST: Q-0003 resolved by ADR-0002 (Python 3.12, CPU-first). Q-0004 resolved: the event is the Constructor Labs camera-localization challenge (notes/brief/).
