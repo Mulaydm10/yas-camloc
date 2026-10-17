@@ -51,7 +51,7 @@ class OdomEstimator(Estimator):
     source, bounds = 'wheels', False
     # sideslip in the prediction (odometry.Odometry.beta, EXP-0020/0021): gains on the fitted constant and
     # lateral-acceleration terms; 0 = plain unicycle
-    BETA0_GAIN, BETA1_GAIN = 0.0, 0.0
+    BETA0_GAIN, BETA1_GAIN = 0.5, 0.5     # half gain: pooled held-out 0.630 -> 0.586 m, lateral 0.477 -> 0.421 (EXP-0025)
 
     def __init__(self, init, cameras, track):
         super().__init__(init, cameras, track)
@@ -257,8 +257,9 @@ class VisualMapLoc(VisualHeading):
         if self._fix_dropped(fs.stamp_ns):
             cams = []
         res = self.pool.map(lambda c: self._seeded(self.loc.localize, c, gray[c], x, y, yaw, radius, feats[c]), cams)
-        fixes = [r for r in res if r is not None and abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
-        use = []
+        res = [dict(r, cam=c) for c, r in zip(cams, res) if r is not None]
+        fixes = [r for r in res if abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
+        use, nis, used0 = [], float('nan'), []
         if len(fixes) >= 2:                      # consensus between cameras
             P = np.array([[f['x'], f['y']] for f in fixes])
             med = np.median(P, axis=0)
@@ -287,6 +288,7 @@ class VisualMapLoc(VisualHeading):
             Sxy = self.ekf.P[:2, :2] + np.eye(2) * sxy ** 2
             r = np.array([mx - x, my - y])
             nis = float(r @ np.linalg.solve(Sxy, r))
+            used0 = use
             if nis > self.NIS_GATE and self.n_reject < self.REJECT_RESET:
                 self.n_reject += 1
                 use = []
@@ -296,7 +298,24 @@ class VisualMapLoc(VisualHeading):
                 self.stats['map_fixes'] += 1
                 self.last_fix_t = fs.stamp_ns
         self.stats['map_rejected'] += len(fixes) - len(use)
+        if self.FIX_LOG:
+            self._log_fixes(fs.stamp_ns, x, y, yaw, res, fixes, used0, use, nis)
         return self.ekf.pose
+
+    # DIAGNOSTIC (default off): per-frame log of every camera's PnP result and what happened to it (EXP-0025, TASK D)
+    FIX_LOG = ''
+
+    def _log_fixes(self, t, x, y, yaw, res, fixes, used0, use, nis):
+        if not hasattr(self, '_fixlog'):
+            self._fixlog = open(self.FIX_LOG, 'w')
+            self._fixlog.write('t_ns,prior_x,prior_y,prior_yaw,cam,n,rms_px,fx,fy,fyaw,status,nis\n')
+        if not res:
+            self._fixlog.write(f'{t},{x:.3f},{y:.3f},{yaw:.5f},,0,,,,,none,\n')
+        for r in res:
+            st = ('accepted' if any(r is u for u in use) else 'nis_rejected' if any(r is u for u in used0)
+                  else 'consensus_rejected' if any(r is f for f in fixes) else 'yaw_rejected')
+            self._fixlog.write(f"{t},{x:.3f},{y:.3f},{yaw:.5f},{r['cam']},{r['n']},{r['rms_px']:.2f},{r['x']:.3f},"
+                               f"{r['y']:.3f},{r['yaw']:.5f},{st},{nis:.2f}\n")
 
     # STRESS TEST ONLY (defaults off): simulate map-matching failure, e.g. a daylight test against a night map.
     # FIX_DROP: probability that a frame gets no map fix; FIX_GAP_S / FIX_PERIOD_S: no fixes for GAP s every PERIOD s.

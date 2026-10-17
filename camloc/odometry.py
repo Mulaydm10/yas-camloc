@@ -7,7 +7,7 @@ Yaw rate (kinematic bicycle with understeer and steering lag):
          wz = v * tan(delta(t - lag) - delta0) / (L * (1 + K * v^2))
 Sideslip:  beta0 / beta1 in odometry.json fit the travel direction minus heading = beta0 + beta1 * v * wz on
          training GT (+1.25 deg median at 5-15 m/s^2). The EKF can use it (run.py BETA0_GAIN / BETA1_GAIN), but
-         it is off by default: on held-out laps it was not consistently better (EXP-0021).
+         full gain was not consistently better (EXP-0021); half gain is the default (EXP-0025).
 `source='estimator'` instead uses the fused v_mps / wz_radps fields (allowed by the brief, ADR-0003).
 """
 import json

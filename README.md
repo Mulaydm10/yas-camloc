@@ -74,21 +74,21 @@ organiser's `tools/evaluate.py`).
 
 | held-out lap | position RMSE | lateral | longitudinal | heading RMSE | p95 | within 1 m |
 |---|---|---|---|---|---|---|
-| 2 | 0.674 m | 0.508 m | 0.443 m | 0.31° | 1.35 m | 90.5 % |
-| 4 | 0.613 m | 0.458 m | 0.407 m | 0.23° | 1.19 m | 89.7 % |
-| 6 | 0.577 m | 0.447 m | 0.366 m | 0.21° | 1.19 m | 92.7 % |
-| **pooled (3 laps)** | **0.630 m** | **0.477 m** | | **0.26°** | | **91.0 %** |
+| 2 | 0.675 m | 0.517 m | 0.433 m | 0.31° | 1.31 m | 86.3 % |
+| 4 | 0.528 m | 0.325 m | 0.416 m | 0.21° | 0.98 m | 95.7 % |
+| 6 | 0.487 m | 0.330 m | 0.358 m | 0.20° | 0.99 m | 95.1 % |
+| **pooled (3 laps)** | **0.586 m** | **0.421 m** | | **0.25°** | | **91.4 %** |
 
 The organiser scoring-script output for each lap is in `submissions/validation/`.
 
 - **Strict hold-out.** Lap 4 is also scored with every calibration (odometry, camera rotations, rotation
   scales) refitted without it (`tools/holdout.py`): 0.677 m against 0.654 m with the same (earlier)
   pipeline, so calibration leakage is about 0.02 m.
-- **Fused car-state variant** (ADR-0003): pooled 0.639 m, lateral 0.430 m, 87.2 % within 1 m.
+- **Fused car-state variant** (ADR-0003; measured before the sideslip default): pooled 0.639 m, lateral 0.430 m, 87.2 % within 1 m.
 
 ![lap 4 held out](docs/traj_lap4_heldout.png)
 
-- **Pit lane:** 1.14 m (whole run, map without lap 6).
+- **Pit lane:** 1.10 m (whole run, map without lap 6).
 - **Organiser (s, n) scorer:** agrees with the x/y numbers within 1 %. GT (s, n) is re-projected onto
   `map.mcap`, because the training bag's `sn_map_state` does not match it (`REPORT.md` §11).
 - **Speed:** 20.6 ms per frame mean, 28.4 ms p95, on an Apple M4 CPU, no GPU (input at 10 Hz; measured from a fresh clone, EXP-0024). The full 20-minute
@@ -105,7 +105,8 @@ How we got here (whole run, allowed signals only; `experiments/experiment_log.md
 | + map-based PnP fixes | ≈1 m |
 | + NIS gate, pit lane in map, lower single-camera threshold | 0.81 m held out |
 | + contrast-normalised (CLAHE) map | 0.78 m held out |
-| + single-camera threshold back to 30 with CLAHE, fix-quality weighting | **0.630 m held out** |
+| + single-camera threshold back to 30 with CLAHE, fix-quality weighting | 0.630 m held out |
+| + sideslip (half gain) in the motion model | **0.586 m held out** |
 
 ### Robustness (the test may differ from the night training run)
 
@@ -138,9 +139,10 @@ visual-heading-only result (21.5 m).
 **Known failure cases and limits**:
 - **Back straight** (around x ≈ −300, y ≈ 0–250): feature-poor at night. With the plain map, lap 2 drifted
   2–5 m sideways there. The CLAHE map with the final settings removes that drift (`docs/traj_lap2_heldout.png`).
-- **Residual lateral bias of about −0.2 m.** The car's travel direction leads its heading by a sideslip angle
-  (0.23° + 0.14° per m/s² of lateral acceleration, fitted on GT), and the motion model ignores it. Modelling
-  it helped laps 4 and 6 but not lap 2, so it is off (EXP-0021).
+- **Sideslip.** The car's travel direction leads its heading by 0.23° + 0.14° per m/s² of lateral acceleration
+  (fitted on GT). Ignoring it biased the estimate about 0.2 m outward, mostly in left turns. At half gain in
+  the motion model the pooled bias falls from −0.21 to −0.03 m (EXP-0025). Lap 2 does not benefit (86 % within
+  1 m), so the effect is not uniform across laps.
 - **No lateral measurement from paint or kerbs:** with cameras about 0.2 m above the border paint it is
   geometrically unobservable (EXP-0006). A real daylight recording has not been tested; the augmentations above
 are only a proxy for it.
