@@ -386,3 +386,19 @@ The plan in §10 point 2 (a landmark map of height structures) became a **geo-re
 11. Which (s, n) reference is authoritative, given that the training `sn_map_state` does not match `map.mcap`?
 12. Is the 35 s bag `rosbag_2026-10-12_23-00-38_cut_120m` meant to be part of the update? It is missing from the ZIP.
 13. Does the test file contain `/tf` for the first pose? (If not, `camloc.run --init x,y,yaw` takes it.)
+
+---
+
+## 12. Response to the Devin review (issue #1, 2026-10-18 CEST)
+
+| # | review point | resolution | evidence |
+|---|---|---|---|
+| 1 | Day/night shift is the biggest risk | (a) **Fallback stress test.** With 50 % / 90 % of map fixes dropped, lap 4 scores 0.70 / 0.88 m. With 30 s / 60 s blackouts it scores 2.5 / 2.9 m and recovers when fixes return. Tens of metres would need a total map failure. (b) **Query-image augmentation** (darker, low contrast, washed out, motion blur, noise) cut the map success rate by up to 5×. (c) **Fix:** CLAHE contrast normalisation at map build and query raises the `fr` success rate to 60–82 % (washed-out 20 → 60 %, blur 11 → 43 %) and is now the default. It also improves the night result (pooled 0.81 → 0.78 m). | EXP-0017, EXP-0018; README "Robustness" |
+| 2 | Leave-one-lap-out over more laps | Laps 2 / 4 / 6: 0.905 / 0.657 / 0.659 m, pooled 0.78 m, 88 % within 1 m | EXP-0014, 0015, 0018 |
+| 3 | Strict hold-out of the calibrations | `tools/holdout.py`: `CAMLOC_EXCLUDE_LAPS` / `CAMLOC_ASSETS`. Odometry, camera rotations and rotation scales refitted without lap 4: lap 4 is 0.677 m against 0.654 m, and the parameters change by <0.3 % (wheelbase 3.688 → 3.678 m) | EXP-0019 |
+| 4 | Weak spots and higher speed | Blur at speed is covered by the blur augmentation in #1. The S7/S1 sectors still have the largest errors; not addressed further | — |
+| 5 | `build_map` exclusion leak | Fixed: both frames of a pair must lie outside the excluded laps | `tools/build_map.py` |
+| 6 | Docs out of date | README results, STATE, worklog and the experiment log are current; `COMPETITION.md` / `VISION.md` need the owner | — |
+| 7 | Rules Q1 | Still open; the allowed-only default is kept | §9 Q1 |
+
+Limit: a real daylight recording has not been tested. The augmentations are only a proxy for it.

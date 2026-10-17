@@ -102,13 +102,13 @@ class VisualHeading(OdomBounds):
         from .align import rot_adjust
         from .tools.make_masks import load_masks
         self.cv2 = cv2
-        adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+        adj = json.loads((C.ASSETS / 'camera_adjust.json').read_text())
         masks = load_masks(self.VIS_CAMS)
         self.kr = {}
         for c in self.VIS_CAMS:
             Rbc = (cameras[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))))[:3, :3]
             self.kr[c] = KeyframeRotation(cameras[c], masks[c][::2, ::2][:364, :753], Rbc)
-        scales = json.loads((C.ROOT / 'camloc' / 'assets' / 'vis_rot_scale.json').read_text())
+        scales = json.loads((C.ASSETS / 'vis_rot_scale.json').read_text())
         self.scale = {c: scales.get(c, 1.0) for c in self.VIS_CAMS}
         self.kf_t = None
         # per-camera OpenCV work runs in threads (OpenCV releases the GIL); results do not depend on threading
@@ -217,7 +217,7 @@ class VisualHeading(OdomBounds):
 class VisualMapLoc(VisualHeading):
     """D5: VisualHeading + absolute pose fixes from the geo-referenced feature map (PnP in fl / fr / r)."""
     MAP_CAMS = ('fr', 'r', 'fl')
-    VMAP = C.ROOT / 'camloc' / 'assets' / 'vmap.npz'
+    VMAP = C.ASSETS / 'vmap.npz'
     SIGMA_XY, SIGMA_YAW = 0.6, np.radians(0.4)       # held-out lap 4: median 0.3-0.66 m, 0.17-0.29 deg
     MIN_INL_SINGLE = 18      # a lone camera fix needs this many PnP inliers (30 -> 18: held-out laps pooled 1.06 -> 0.81 m, EXP-0015)
     AGREE_M = 2.0
@@ -227,13 +227,14 @@ class VisualMapLoc(VisualHeading):
         from .align import rot_adjust
         from .tools.make_masks import load_masks
         from .vmap import MapLocalizer, VisualMap
-        adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+        adj = json.loads((C.ASSETS / 'camera_adjust.json').read_text())
         Tbc = {c: cameras[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))) for c in self.MAP_CAMS}
         masks = {c: m[::2, ::2][:364, :753] for c, m in load_masks(self.MAP_CAMS).items()}
         self.loc = MapLocalizer(VisualMap(self.VMAP), cameras, Tbc, masks)
         self.stats.update({'map_fixes': 0, 'map_rejected': 0})
         self.last_fix_t = None
         self.n_reject = 0
+        self.t0_stress = None
 
     @property
     def DECODE_CAMS(self):
@@ -248,6 +249,8 @@ class VisualMapLoc(VisualHeading):
         sd = float(np.sqrt(max(self.ekf.P[0, 0] + self.ekf.P[1, 1], 0)))
         radius = float(np.clip(3 * sd + 25, 40, 150))
         feats = {c: f.result() for c, f in feats.items()}
+        if self._fix_dropped(fs.stamp_ns):
+            cams = []
         res = self.pool.map(lambda c: self._seeded(self.loc.localize, c, gray[c], x, y, yaw, radius, feats[c]), cams)
         fixes = [r for r in res if r is not None and abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
         use = []
@@ -280,6 +283,17 @@ class VisualMapLoc(VisualHeading):
                 self.last_fix_t = fs.stamp_ns
         self.stats['map_rejected'] += len(fixes) - len(use)
         return self.ekf.pose
+
+    # STRESS TEST ONLY (defaults off): simulate map-matching failure, e.g. a daylight test against a night map.
+    # FIX_DROP: probability that a frame gets no map fix; FIX_GAP_S / FIX_PERIOD_S: no fixes for GAP s every PERIOD s.
+    FIX_DROP, FIX_GAP_S, FIX_PERIOD_S = 0.0, 0.0, 0.0
+
+    def _fix_dropped(self, t_ns):
+        if self.t0_stress is None:
+            self.t0_stress, self.rng_stress = t_ns, np.random.default_rng(0)
+        if self.FIX_DROP > 0 and self.rng_stress.random() < self.FIX_DROP:
+            return True
+        return self.FIX_PERIOD_S > 0 and ((t_ns - self.t0_stress) / 1e9) % self.FIX_PERIOD_S >= self.FIX_PERIOD_S - self.FIX_GAP_S
 
     NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
     REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again

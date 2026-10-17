@@ -46,3 +46,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - Speed: thread pool per camera, decode once, direct CDR image parsing: 38 -> 22 ms/frame, output bit-identical.
 - `run.sh` single entry point (smoke-tested end to end); README results filled; plots in `docs/`; REPORT.md §11 (results, organiser update, questions 11-13).
 - Two Claude sessions overlapped (screen session national-e8 wrote EXP-0012/0013 rows); duplicate row removed, session closed on the user's request. 19 tests green.
+
+## 2026-10-18 00:45 CEST - Claude (Opus) - Devin review (issue #1) resolved (EXP-0017..0019)
+- Stress test of the fallback: map-fix dropout / blackouts give metres, not tens of metres (EXP-0017).
+- Robustness: query-image augmentations in `tools/vmap_check.py --aug`; CLAHE-normalised map (`build_map --norm`, flag in the map) raises map success under altered images 2-4x and improves the held-out pooled score 0.81 -> 0.78 m (EXP-0018). Now the default in `run.sh`.
+- Strict hold-out: `tools/holdout.py`, `CAMLOC_EXCLUDE_LAPS` / `CAMLOC_ASSETS` (config.ASSETS); leakage about 0.02 m (EXP-0019).
+- `build_map.py` exclusion leak fixed (both frames of a pair checked). 20 tests green. REPORT.md §12 maps each review point to its resolution.

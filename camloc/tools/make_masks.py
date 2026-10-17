@@ -15,7 +15,7 @@ import numpy as np
 from .. import config as C
 from ..data import FrameSet, Replay
 
-ASSETS = C.ROOT / 'camloc' / 'assets'
+ASSETS = C.ASSETS
 W, H = 1506, 728
 
 

@@ -18,8 +18,14 @@ def orb():
     return cv2.ORB_create(**ORB_PARAMS)
 
 
-def detect(det, gray, mask):
-    kp, des = det.detectAndCompute(gray, mask)
+def normalize(gray):
+    """Local contrast normalisation (CLAHE): keeps ORB's absolute FAST threshold meaningful under lighting /
+    contrast changes (EXP-0018). Applied identically at map build and query time (map flag `norm`)."""
+    return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+
+
+def detect(det, gray, mask, norm=False):
+    kp, des = det.detectAndCompute(normalize(gray) if norm else gray, mask)
     if des is None:
         return np.zeros((0, 2), np.float32), np.zeros((0, 32), np.uint8)
     return np.array([k.pt for k in kp], np.float32), des
@@ -35,6 +41,7 @@ class VisualMap:
         self.P = z['P']                    # (N, 3) map points
         self.D = z['D']                    # (N, 32) ORB descriptors
         self.cams = [str(c) for c in z['cams']]
+        self.norm = bool(z['norm']) if 'norm' in z.files else False
         self.tree = cKDTree(self.kf_xy)
 
     def candidates(self, cam, x, y, yaw, radius=40.0, max_dyaw=np.radians(35), max_kf=12):
@@ -65,7 +72,7 @@ class MapLocalizer:
 
     def features(self, cam, gray_half):
         """ORB features (pose-independent, so they can be computed while the filter is still updating)."""
-        return detect(self.det[cam], gray_half, self.masks[cam])
+        return detect(self.det[cam], gray_half, self.masks[cam], self.vmap.norm)
 
     def localize(self, cam, gray_half, x, y, yaw, radius=40.0, feats=None):
         P, D = self.vmap.candidates(cam, x, y, yaw, radius)

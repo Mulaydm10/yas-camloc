@@ -13,6 +13,7 @@ import numpy as np
 
 from .. import config as C
 from ..groundtruth import load_gt
+from .holdout import excluded
 from ..odometry import PARAMS, batch, integrate, wheel_rate
 from ..track import wrap
 
@@ -73,7 +74,7 @@ def main():
     k = np.ones(11) / 11
     v_gt, wz_gt = np.convolve(v_gt, k, 'same'), np.convolve(wz_gt, k, 'same')
     acc = np.interp(t, gt['t'], gt['pos_acc'])
-    good = (acc <= 1.0) & (F['valid_wheelsspeeds_b'] > 0)
+    good = (acc <= 1.0) & (F['valid_wheelsspeeds_b'] > 0) & ~excluded(t)     # CAMLOC_EXCLUDE_LAPS hold-out
     moving = good & (v_gt > 5)
 
     report = {'speed': {}, 'yaw': {}, 'drift_10s': {}}

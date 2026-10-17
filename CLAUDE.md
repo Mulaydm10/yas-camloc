@@ -32,7 +32,9 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requi
 .venv/bin/python -m camloc.tools.vis_heading_check    # training-time: visual rotation vs GT -> camloc/assets/vis_rot_scale.json
 .venv/bin/python -m camloc.tools.calibrate_odometry   # training-time fit (uses GT) -> camloc/assets/odometry.json
 .venv/bin/python -m camloc.tools.make_masks           # ego-body masks from camloc/assets/body_polygons.json
-.venv/bin/python -m camloc.evaluate cache/sub.csv [--laps 4] [--official]   # metrics + sector/speed/lane/lap breakdown
+.venv/bin/python -m camloc.evaluate cache/sub.csv [--laps 4] [--official] [--sn]   # metrics + sector/speed/lane/lap breakdown
+.venv/bin/python -m camloc.tools.build_map --norm [--exclude-laps 4] --out <map.npz>   # training-time visual map (CLAHE)
+#   strict hold-out of all calibrations: see camloc/tools/holdout.py (CAMLOC_EXCLUDE_LAPS, CAMLOC_ASSETS)
 ```
 Rule: inference code never imports `camloc.groundtruth` / `camloc.evaluate` (enforced by `tests/test_smoke.py`).
 

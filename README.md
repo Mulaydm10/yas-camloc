@@ -39,7 +39,7 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
    - The rotation since a keyframe at most 1.5 s old is measured in `fl`, `fr` and `r` and fused through a
      cloned heading state.
    - Per-camera rotation scale (`fr` under-reports by 7.5 %), with a two-camera consensus.
-3. **Map-based absolute fixes.**
+3. **Map-based absolute fixes** (images contrast-normalised with CLAHE at build and query time).
    - At training time, ORB features are triangulated with the GT camera poses into a 3D map
      (`tools/build_map.py`).
    - At run time, per-camera PnP + RANSAC, gated by cross-camera consensus and an NIS test that can recover
@@ -66,18 +66,22 @@ organiser's `tools/evaluate.py`).
 
 | held-out lap | position RMSE | lateral | longitudinal | heading RMSE | p95 | within 1 m |
 |---|---|---|---|---|---|---|
-| 2 | 0.947 m | 0.713 m | 0.624 m | 0.45° | 2.02 m | 79.9 % |
-| 4 | 0.654 m | 0.441 m | 0.482 m | 0.25° | 1.18 m | 91.1 % |
-| 6 | 0.700 m | 0.426 m | 0.555 m | 0.26° | 1.51 m | 90.6 % |
-| **pooled (3 laps)** | **0.81 m** | | | | | **86 %** |
+| 2 | 0.905 m | 0.536 m | 0.729 m | 0.29° | 1.82 m | 86.3 % |
+| 4 | 0.657 m | 0.480 m | 0.449 m | 0.20° | 1.20 m | 86.8 % |
+| 6 | 0.659 m | 0.475 m | 0.456 m | 0.22° | 1.28 m | 90.8 % |
+| **pooled (3 laps)** | **0.78 m** | | | | | **88 %** |
+
+- **Strict hold-out.** Lap 4 is also scored with every calibration (odometry, camera rotations, rotation
+  scales) refitted without it (`tools/holdout.py`): 0.677 m against 0.654 m with the same pipeline, so
+  calibration leakage is about 0.02 m.
 
 ![lap 4 held out](docs/traj_lap4_heldout.png)
 
-- **Pit lane:** 1.05 m (whole run, map without lap 6).
+- **Pit lane:** 1.13 m (whole run, map without lap 6).
 - **Organiser (s, n) scorer:** agrees with the x/y numbers within 1 %. GT (s, n) is re-projected onto
   `map.mcap`, because the training bag's `sn_map_state` does not match it (`REPORT.md` §11).
-- **Speed:** 22 ms per frame mean, 35 ms p95, on an Apple M4 CPU (input at 10 Hz). The full 20-minute run
-  takes 4.8 minutes.
+- **Speed:** 22–27 ms per frame mean, 35 ms p95, on an Apple M4 CPU (input at 10 Hz). The full 20-minute
+  run takes about 5 minutes.
 
 How we got here (whole run, allowed signals only; `experiments/experiment_log.md`):
 
@@ -88,12 +92,42 @@ How we got here (whole run, allowed signals only; `experiments/experiment_log.md
 | + map priors on straights | 55.1 m |
 | + visual heading | 21.5 m |
 | + map-based PnP fixes | ≈1 m |
-| + NIS gate, pit lane in map, lower single-camera threshold | **0.81 m held out** |
+| + NIS gate, pit lane in map, lower single-camera threshold | 0.81 m held out |
+| + contrast-normalised (CLAHE) map | **0.78 m held out** |
 
-**Known failure case.** The back straight (around x ≈ −300, y ≈ 0–130) is feature-poor at night. Map
-localisation succeeds in only 5–19 % of frames there, so the filter dead-reckons. On lap 2 this gives a
-2–3 m lateral excursion (`docs/traj_lap2_heldout.png`). Daylight test conditions have not been validated:
-the training run is at night.
+### Robustness (the test may differ from the night training run)
+
+**Image changes.** Query images were altered on held-out lap 4 (`tools/vmap_check.py --aug`); the map is
+built from the unchanged night images. Columns give the `fr` map-localisation success rate:
+
+| query images | plain ORB map | CLAHE-normalised map (default) |
+|---|---|---|
+| unchanged | 60 % | 82 % |
+| darker (gamma 2) | 42 % | 72 % |
+| contrast halved | 22 % | 66 % |
+| washed out ("day": gamma 0.4, contrast 0.6) | 20 % | 60 % |
+| 9 px motion blur | 11 % | 43 % |
+
+When a fix succeeds it stays accurate: median 0.4–0.5 m in every case.
+
+**Losing map fixes.** These are switches for testing only (`--set FIX_DROP=…` / `FIX_GAP_S=… FIX_PERIOD_S=…`):
+
+| map fixes | lap 4 | whole run |
+|---|---|---|
+| all | 0.65 m | 0.84 m |
+| 50 % dropped at random | 0.70 m | 0.97 m |
+| 90 % dropped at random | 0.88 m | 2.34 m |
+| none for 30 s of every 60 s | 2.48 m | 3.10 m |
+| none for 60 s of every 120 s | 2.86 m | 4.60 m |
+
+The filter recovers as soon as fixes return. Only a total, permanent map failure would fall back to the
+visual-heading-only result (21.5 m).
+
+**Known failure cases** (`docs/traj_lap2_heldout.png`):
+- The back straight (around x ≈ −300, y ≈ 0–250) is feature-poor at night. With the plain map, lap 2 drifted
+  2–5 m sideways there. The CLAHE map removes that drift, but one 3.7 m along-track step remains for 3 s.
+- Two brief lateral spikes of about 2.5 m occur in the slow corners. A real daylight recording has not been tested; the augmentations above
+are only a proxy for it.
 
 ## Repository
 

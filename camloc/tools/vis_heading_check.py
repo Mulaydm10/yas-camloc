@@ -13,6 +13,7 @@ from .. import config as C
 from ..align import rot_adjust
 from ..data import FrameSet, Replay, StateEvent, load_static
 from ..groundtruth import load_gt6
+from .holdout import excluded
 from ..vision_rot import KeyframeRotation
 from .make_masks import load_masks
 
@@ -33,7 +34,7 @@ def fit_scales(a):
             x, y = x[keep], y[keep]
         out[c] = float(k)
         print(f'{c}: rotation scale vis/gt {k:.4f}')
-    (C.ROOT / 'camloc' / 'assets' / 'vis_rot_scale.json').write_text(json.dumps(
+    (C.ASSETS / 'vis_rot_scale.json').write_text(json.dumps(
         {'_doc': 'visual/GT rotation scale per camera (training fit, tools/vis_heading_check.py); divide by it', **out}, indent=1))
 
 
@@ -41,7 +42,7 @@ def main(start=0.0, dur=None):
     cams, _ = load_static()
     g = load_gt6()
     yu = np.unwrap(g['yaw'])
-    adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+    adj = json.loads((C.ASSETS / 'camera_adjust.json').read_text())
     masks = load_masks(CAMS)
     kr = {c: KeyframeRotation(cams[c], masks[c][::2, ::2][:364, :753],
                               (cams[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))))[:3, :3]) for c in CAMS}
@@ -49,6 +50,9 @@ def main(start=0.0, dur=None):
     for ev in Replay(state='allowed', start_s=start, duration_s=dur):
         if isinstance(ev, StateEvent):
             v = 0.3052 * max(0.5 * (ev.fields['omega_w_fl'] + ev.fields['omega_w_fr']), 0)
+            continue
+        if excluded(ev.stamp_ns):                     # CAMLOC_EXCLUDE_LAPS hold-out: restart after the gap
+            kf_t = None
             continue
         gray = {c: cv2.imdecode(np.frombuffer(ev.images[c], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_2) for c in CAMS if c in ev.images}
         if kf_t is None or (ev.stamp_ns - kf_t) / 1e9 > 1.5:

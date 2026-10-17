@@ -5,6 +5,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MCAP = Path(os.environ.get('CAMLOC_MCAP', ROOT / 'data' / 'c0_2026-10-13_22-53-42_camloc' / 'c0_2026-10-13_22-53-42_camloc_0.mcap'))
 CACHE = ROOT / 'cache'
+# Calibration assets (odometry, camera rotations, rotation scales, masks, visual map). Overridable so a strict
+# hold-out can use assets refitted without the scored lap (camloc/tools/holdout.py).
+ASSETS = Path(os.environ.get('CAMLOC_ASSETS', ROOT / 'camloc' / 'assets'))
+# TRAINING tools only: laps (as numbered by camloc.evaluate.lap_windows) whose GT must not be used, e.g. "4"
+EXCLUDE_LAPS = [int(x) for x in os.environ.get('CAMLOC_EXCLUDE_LAPS', '').split(',') if x.strip()]
 
 CAMS = ('fl', 'fr', 'cl', 'cr', 'r', 'rl', 'rr')
 IMG_TOPIC = '/constructor0/sensor/camera_{}/compressed_image'

@@ -22,6 +22,6 @@ fi
 PY=.venv/bin/python
 if [ ! -f camloc/assets/vmap.npz ]; then
   echo "building the visual map from the training bag ($TRAIN) ..."
-  CAMLOC_MCAP="$TRAIN" $PY -W ignore -m camloc.tools.build_map --out camloc/assets/vmap.npz
+  CAMLOC_MCAP="$TRAIN" $PY -W ignore -m camloc.tools.build_map --norm --out camloc/assets/vmap.npz
 fi
 $PY -W ignore -m camloc.run --mcap "$TEST" --out "$OUT" --estimator vismap

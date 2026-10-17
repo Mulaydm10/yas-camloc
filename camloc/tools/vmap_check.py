@@ -1,7 +1,11 @@
 """TRAINING DIAGNOSTIC: map-based PnP localisation accuracy vs GT on a time window, querying the map with the
 GT pose perturbed by a given error (to mimic the filter's prior).
 
-    python -m camloc.tools.vmap_check cache/vmap_no_lap4.npz 602.8 701.7 [prior_err_m]
+    python -m camloc.tools.vmap_check cache/vmap_no_lap4.npz 602.8 701.7 [prior_err_m [step]] [--aug gamma0.5]
+
+--aug alters the QUERY images only (the map stays as built) to probe robustness to lighting / speed changes:
+gamma0.5 (brighter), gamma2 (darker), contrast0.5, blur9 (9 px horizontal motion blur, half resolution),
+noise10 (Gaussian, sigma 10 grey levels), day (gamma 0.4 + contrast 0.6: washed-out bright image).
 """
 import json
 import sys
@@ -19,10 +23,28 @@ from .make_masks import load_masks
 CAMS = ('fl', 'fr', 'r')
 
 
-def main(path, t0, t1, prior=10.0, step=3):
+def augment(g, aug):
+    f = g.astype(np.float32)
+    if aug.startswith('gamma'):
+        f = 255 * (f / 255) ** float(aug[5:])
+    elif aug.startswith('contrast'):
+        f = 128 + float(aug[8:]) * (f - 128)
+    elif aug.startswith('blur'):
+        k = int(aug[4:])
+        f = cv2.filter2D(f, -1, np.ones((1, k), np.float32) / k)
+    elif aug.startswith('noise'):
+        f = f + np.random.default_rng(int(f.sum()) % 2**32).normal(0, float(aug[5:]), f.shape)
+    elif aug == 'day':
+        f = 128 + 0.6 * (255 * (f / 255) ** 0.4 - 128)
+    elif aug != 'none':
+        raise SystemExit(f'unknown --aug {aug}')
+    return np.clip(f, 0, 255).astype(np.uint8)
+
+
+def main(path, t0, t1, prior=10.0, step=3, aug='none'):
     cams, _ = load_static()
     gt = load_gt()
-    adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+    adj = json.loads((C.ASSETS / 'camera_adjust.json').read_text())
     Tbc = {c: cams[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))) for c in CAMS}
     loc = MapLocalizer(VisualMap(path), cams, Tbc, {c: m[::2, ::2][:364, :753] for c, m in load_masks(CAMS).items()})
     rng = np.random.default_rng(0)
@@ -40,7 +62,7 @@ def main(path, t0, t1, prior=10.0, step=3):
         for c in CAMS:
             if c not in ev.images:
                 continue
-            g = cv2.imdecode(np.frombuffer(ev.images[c], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_2)
+            g = augment(cv2.imdecode(np.frombuffer(ev.images[c], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_2), aug)
             r = loc.localize(c, g, gx + dx, gy + dy, gyaw)
             if r is None:
                 rows.append((CAMS.index(c), np.nan, np.nan, np.nan, 0, np.nan))
@@ -61,4 +83,10 @@ def main(path, t0, t1, prior=10.0, step=3):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], float(sys.argv[2]), float(sys.argv[3]), *(float(x) for x in sys.argv[4:]))
+    argv = sys.argv[1:]
+    aug = 'none'
+    if '--aug' in argv:
+        i = argv.index('--aug')
+        aug = argv[i + 1]
+        del argv[i:i + 2]
+    main(argv[0], float(argv[2 - 1]), float(argv[2]), *(float(x) for x in argv[3:]), aug=aug)

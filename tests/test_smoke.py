@@ -61,7 +61,7 @@ def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
     eval_only = {'groundtruth.py', 'evaluate.py',                                     # evaluation only
                  'calibrate_odometry.py', 'calibrate_cameras.py', 'overlay_borders.py',   # training-time only
-                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py', 'plot_traj.py'}
+                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py', 'plot_traj.py', 'holdout.py'}
     for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue
@@ -270,3 +270,15 @@ def test_run_parameter_overrides(tmp_path):
     from camloc.run import run
     with pytest.raises(SystemExit):
         run(C.DEFAULT_MCAP, tmp_path / 'x.csv', 'hold', duration_s=0.5, overrides={'NO_SUCH': '1'})
+
+
+def test_holdout_is_a_noop_without_excluded_laps_and_augment_keeps_shape():
+    from camloc.tools import holdout
+    from camloc.tools.vmap_check import augment
+    if not C.EXCLUDE_LAPS:
+        assert holdout.excluded(123) is False and not holdout.excluded(np.arange(5)).any()
+    g = (np.arange(64 * 48) % 256).astype(np.uint8).reshape(48, 64)
+    for a in ('none', 'gamma0.5', 'gamma2', 'contrast0.5', 'blur9', 'noise10', 'day'):
+        out = augment(g, a)
+        assert out.shape == g.shape and out.dtype == np.uint8
+    assert augment(g, 'gamma0.5').mean() > g.mean() > augment(g, 'gamma2').mean()

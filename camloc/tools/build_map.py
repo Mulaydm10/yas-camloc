@@ -60,11 +60,12 @@ def triangulate(c, T0, T1, uv0, uv1):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--exclude-laps', type=int, nargs='*', default=[])
-    ap.add_argument('--out', default=str(C.ROOT / 'camloc' / 'assets' / 'vmap.npz'))
+    ap.add_argument('--norm', action='store_true', help='CLAHE-normalise images (stored in the map; EXP-0018)')
+    ap.add_argument('--out', default=str(C.ASSETS / 'vmap.npz'))
     a = ap.parse_args(argv)
     cams, _ = load_static()
     g6 = load_gt6()
-    adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+    adj = json.loads((C.ASSETS / 'camera_adjust.json').read_text())
     Tbc = {c: cams[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))) for c in MAP_CAMS}
     masks = {c: m[::2, ::2][:364, :753].astype(np.uint8) * 255 for c, m in load_masks(MAP_CAMS).items()}
     laps = lap_windows(g6)
@@ -85,7 +86,7 @@ def main(argv=None):
         if len(buf) < PAIR_GAP + 1 or k % STEP:
             continue
         e0, e1 = buf[0], buf[-1]
-        if any(t0 <= e0.stamp_ns <= t1 for t0, t1 in excl):
+        if any(t0 <= e.stamp_ns <= t1 for t0, t1 in excl for e in (e0, e1)):   # neither view in an excluded lap
             continue
         for c in MAP_CAMS:
             if c not in e0.images or c not in e1.images:
@@ -96,8 +97,8 @@ def main(argv=None):
                 continue
             g0 = cv2.imdecode(np.frombuffer(e0.images[c], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_2)
             g1 = cv2.imdecode(np.frombuffer(e1.images[c], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_2)
-            uv0, d0 = detect(det, g0, masks[c])
-            uv1, d1 = detect(det, g1, masks[c])
+            uv0, d0 = detect(det, g0, masks[c], a.norm)
+            uv1, d1 = detect(det, g1, masks[c], a.norm)
             if len(uv0) < 30 or len(uv1) < 30:
                 continue
             mm = bf.match(d0, d1)
@@ -116,7 +117,7 @@ def main(argv=None):
             kf_ptr.append(kf_ptr[-1] + int(keep.sum()))
     np.savez_compressed(a.out, kf_cam=np.array(kf_cam, np.int8), kf_xy=np.array(kf_xy), kf_yaw=np.array(kf_yaw),
                         kf_ptr=np.array(kf_ptr), P=np.vstack(Ps), D=np.vstack(Ds), cams=np.array(MAP_CAMS),
-                        excluded_laps=np.array(a.exclude_laps))
+                        excluded_laps=np.array(a.exclude_laps), norm=np.array(a.norm))
     n = np.bincount(kf_cam, minlength=len(MAP_CAMS))
     print(f'keyframes {len(kf_cam)} {dict(zip(MAP_CAMS, n.tolist()))}, points {kf_ptr[-1]} '
           f'({kf_ptr[-1] / max(len(kf_cam), 1):.0f}/keyframe) -> {a.out}')

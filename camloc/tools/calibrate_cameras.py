@@ -20,13 +20,14 @@ from ..align import ground_roi, rot_adjust
 from ..data import FrameSet, Replay, load_static
 from ..geometry import T_map_base, project
 from ..groundtruth import load_gt6
+from .holdout import excluded
 from ..lines import SCALE
 from ..measure import near_border_points, tophat, vertical_residuals
 from ..road import Road3D
 from .make_masks import load_masks
 from ..data import load_bounds3d as bounds3d
 
-OUT = C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json'
+OUT = C.ASSETS / 'camera_adjust.json'
 CAMS = ('cl', 'cr', 'rl', 'rr', 'fr', 'fl')
 HUBER = 2.0          # px
 PRIOR_DEG = 1.0      # Tikhonov prior on each correction angle (README: calibrated yaw/pitch good to ~1 deg)
@@ -47,7 +48,7 @@ def collect(n_frames, cameras, masks, rois, border, g6):
         if ts > t_hi:
             break
         i = np.searchsorted(g6['t'], ev.stamp_ns)
-        if g6['pos_acc'][i] > 0.5:
+        if g6['pos_acc'][i] > 0.5 or excluded(ev.stamp_ns):     # CAMLOC_EXCLUDE_LAPS hold-out
             continue
         T = T_map_base(*[g6[k][i] for k in ('x', 'y', 'z', 'roll', 'pitch', 'yaw')])
         fr = {}

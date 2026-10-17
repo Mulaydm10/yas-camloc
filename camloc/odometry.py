@@ -14,7 +14,7 @@ import numpy as np
 
 from . import config as C
 
-PARAMS = C.ROOT / 'camloc' / 'assets' / 'odometry.json'
+PARAMS = C.ASSETS / 'odometry.json'
 
 
 def wheel_rate(f, mode):
