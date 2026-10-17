@@ -15,3 +15,4 @@
 |---|---|---|---|
 | 2026-10-16 (time TODO(<owner>)) | all LOCKED files | hackathon-setup agent | Initial authorship (expected, not a violation; logged to model the behavior) |
 | 2026-10-18 01:55 CEST | COMPETITION.md | Claude (Opus), as Main Agent on the owner's instruction ("confirm go") | Filled event, format, rubric weights and hard rules from the challenge brief PDF; deadline, dates, team size and roster left TODO(<owner>) (not in the brief) |
+| 2026-10-18 02:10 CEST | COMPETITION.md | Claude (Opus), as Main Agent (Devin TASK B on #2, owner-approved workflow) | Added the brief's date line (16 opening, 17-18 work, 19-20 evaluation, 21 closing) and host SchubKI; exact times / timezone not in the brief, left TODO(<owner>) |

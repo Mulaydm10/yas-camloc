@@ -7,12 +7,12 @@ Every other doc **links here** instead of restating a date, weight or rule. A du
 | Field | Value |
 |---|---|
 | Event name | National AI Hackathon 2026 (licence text of the dataset, brief: `notes/brief/Constructor Labs - Camera-based localization on a race track.pdf`) |
-| Host / organizer | Constructor Labs (challenge owner) |
+| Host / organizer | SchubKI (hackathon host, "National AI Hackathon 2026 by SchubKI"); Constructor Labs (challenge owner) |
 | Event link | TODO(<owner>) |
 | Theme / track | Camera-based localization on a race track (Yas Marina Circuit) |
-| Start | TODO(<owner>) (date, time, timezone) |
-| **Submission deadline** | TODO(<owner>) (date, time, **timezone**) |
-| Demo / judging time | TODO(<owner>) (date, time, timezone) |
+| Start | 2026-10-16 (opening). Brief: "16-21 of October 2026 (16 – opening, 17-18 – work, 19-20 – evaluation, 21 - closing)". Time and timezone: not stated, TODO(<owner>) |
+| **Submission deadline** | Work days are 2026-10-17 and 2026-10-18, so the last work day is **2026-10-18**. Exact upload time and **timezone** are not stated: TODO(<owner>) (Q-0002) |
+| Demo / judging time | Evaluation 2026-10-19 to 2026-10-20; closing 2026-10-21. Times / timezone: TODO(<owner>) |
 | Submission format | Pose CSV for the hidden test run (`timestamp_ns, x [m], y [m], yaw [rad]`, track frame, stamp = image header stamp); full source code (Git link or archive) with a run script; validation results (scoring-script output); presentation (max. 5 min, max. 6 slides); trajectory-vs-GT video or plot. Upload channel / form: TODO(<owner>) |
 | Team size limit | TODO(<owner>) |
 
