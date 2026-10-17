@@ -282,3 +282,18 @@ def test_holdout_is_a_noop_without_excluded_laps_and_augment_keeps_shape():
         out = augment(g, a)
         assert out.shape == g.shape and out.dtype == np.uint8
     assert augment(g, 'gamma0.5').mean() > g.mean() > augment(g, 'gamma2').mean()
+
+
+def test_slip_state_learns_a_constant_sideslip_from_position_fixes():
+    from camloc.filter import PoseEKF
+    q = {'sigma_v_frac': 0.02, 'sigma_wz': 0.005, 'sigma_v_abs': 0.1}
+    true_beta, v, dt = np.radians(1.5), 20.0, 0.1
+    f = PoseEKF(0, 0, 0, q, slip={'sigma0': np.radians(1.0), 'q': np.radians(0.05), 'tau': 1e6})
+    x = y = 0.0
+    for _ in range(300):
+        x += v * np.cos(true_beta) * dt
+        y += v * np.sin(true_beta) * dt
+        f.predict(dt, v, 0.0)
+        f.update_pose(x, y, 0.0, 0.3, np.radians(0.2))
+    assert abs(f.X[4] - true_beta) < np.radians(0.3)
+    assert f.P.shape == (5, 5) and np.all(np.linalg.eigvalsh(f.P) > -1e-12)

@@ -9,6 +9,7 @@ induced image shift falls off with distance (dv ~ f * dh / d) while a rotation s
 At the best dh the near-border lateral sensitivity (px per m, half resolution) is recomputed.
 
     python -m camloc.tools.fit_camera_height [--frames 320]
+    python -m camloc.tools.fit_camera_height --scan     # then: per-frame lateral estimate scatter (E.1 verdict)
 """
 import argparse
 import json
@@ -20,6 +21,7 @@ from ..align import ground_roi, rot_adjust
 from ..data import load_bounds3d, load_static
 from ..geometry import project
 from ..groundtruth import load_gt6
+from ..measure import vertical_residuals
 from ..road import Road3D
 from ..track import TrackModel
 from . import calibrate_cameras as CC
@@ -129,5 +131,55 @@ def main(argv=None):
     (C.CACHE / 'camera_height_fit.json').write_text(json.dumps(report, indent=1))
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and '--scan' not in __import__('sys').argv:
     main()
+
+
+def lateral_scan(cam, frames, c, ang, dh, deltas=np.round(np.arange(-1.5, 1.51, 0.1), 2)):
+    """Direct test of the measurement: per frame, shift the GT pose sideways by delta and pick the delta whose
+    projected border best matches the image (median |dv| over points found at every delta). The spread of the
+    picked delta around 0 (truth) is the per-frame lateral measurement noise of this camera."""
+    A = rot_adjust(*ang)
+    est = []
+    for T, f in frames:
+        th, valid, pts = f[c]
+        pts = pts - [0.0, 0.0, dh]
+        costs = []
+        for d in deltas:
+            T2 = T.copy()
+            T2[:3, 3] += d * T[:3, 1]
+            r = vertical_residuals(cam, th, valid, T2, pts, A)
+            costs.append(np.median(np.abs(r[:, 2])) if len(r) >= 8 else np.inf)
+        costs = np.array(costs)
+        if np.isfinite(costs).sum() >= len(deltas) // 2:
+            est.append(deltas[int(np.argmin(costs))])
+    est = np.array(est)
+    return est
+
+
+def scan_main():
+    rep = json.loads((C.CACHE / 'camera_height_fit.json').read_text())
+    cameras, bounds = load_static()
+    tm = TrackModel(bounds)
+    masks = {c: m[::2, ::2][:364, :753] for c, m in load_masks().items()}
+    rois = {c: ground_roi(cameras[c], 2, 60) for c in CC.CAMS}
+    road = Road3D(load_bounds3d(C.DEFAULT_MCAP))
+    frames = collect(320, cameras, masks, rois, np.vstack([road.L, road.R]), load_gt6())
+    keep = [(T, f) for T, f in frames
+            if str(tm.locate(T[0, 3], T[1, 3], np.arctan2(T[1, 0], T[0, 0]))[0][0]) == 'track'
+            and tm.lanes['track'].straight_at(tm.locate(T[0, 3], T[1, 3], np.arctan2(T[1, 0], T[0, 0]))[1])[0]]
+    valf = keep[1::2]
+    for c in CAMS:
+        for dh in (0.0, rep[c]['best_dh_m']):
+            row = [r for r in rep[c]['rows'] if abs(r[0] - dh) < 1e-6][0]
+            e = lateral_scan(cameras[c], valf, c, np.radians(row[4]), dh)
+            mad = 1.4826 * np.median(np.abs(e - np.median(e))) if len(e) else np.nan
+            print(f'{c} dh {dh:+.1f}: frames {len(e)}, lateral estimate median {np.median(e):+.2f} m, '
+                  f'robust std {mad:.2f} m, RMS {np.sqrt(np.mean(e ** 2)):.2f} m, |err|<0.3 m: {np.mean(np.abs(e) < 0.3) * 100:.0f} %')
+            rep[c][f'scan_dh{dh:+.1f}'] = {'median_m': float(np.median(e)), 'robust_std_m': float(mad),
+                                           'rms_m': float(np.sqrt(np.mean(e ** 2))), 'n': int(len(e))}
+    (C.CACHE / 'camera_height_fit.json').write_text(json.dumps(rep, indent=1))
+
+
+if __name__ == '__main__' and __import__('sys').argv[1:2] == ['--scan']:
+    scan_main()

@@ -12,15 +12,24 @@ from .track import wrap
 
 
 class PoseEKF:
-    """State X = [x, y, yaw, yaw_kf]. yaw_kf is a stochastic clone of the heading at the last visual keyframe
-    (static in prediction), so relative visual rotation "yaw - yaw_kf" can be fused consistently."""
+    """State X = [x, y, yaw, yaw_kf(, slip)]. yaw_kf is a stochastic clone of the heading at the last visual
+    keyframe (static in prediction), so relative visual rotation "yaw - yaw_kf" can be fused consistently.
+    Optional `slip` (dict sigma0, q, tau): a sideslip-angle bias state added to the travel direction, a
+    first-order Gauss-Markov process learned online from the absolute fixes (TASK D.2, EXP-0026)."""
     N = 4
 
-    def __init__(self, x, y, yaw, q, p0=(0.05, 0.05, np.radians(0.5))):
-        self.X = np.array([x, y, yaw, yaw], float)
-        self.P = np.diag(np.square([*p0, p0[2]]))
+    def __init__(self, x, y, yaw, q, p0=(0.05, 0.05, np.radians(0.5)), slip=None):
+        self.slip = slip
+        self.N = 5 if slip else 4
+        self.X = np.array([x, y, yaw, yaw] + ([0.0] if slip else []), float)
+        self.P = np.diag(np.square([*p0, p0[2]] + ([slip['sigma0']] if slip else [])))
         self.P[2, 3] = self.P[3, 2] = self.P[2, 2]
         self.q = q
+
+    def _row(self, *vals):
+        h = np.zeros((1, self.N))
+        h[0, :len(vals)] = vals
+        return h
 
     def clone_heading(self):
         """Start a new keyframe: yaw_kf := yaw, with the matching covariance."""
@@ -35,15 +44,22 @@ class PoseEKF:
         if dt <= 0:
             return
         x, y, h = self.X[:3]
-        hm = h + 0.5 * wz * dt + beta
+        hm = h + 0.5 * wz * dt + beta + (self.X[4] if self.slip else 0.0)
         c, s = np.cos(hm), np.sin(hm)
         self.X[:3] = [x + v * c * dt, y + v * s * dt, wrap(h + wz * dt)]
-        F = np.eye(4)
+        F = np.eye(self.N)
         F[0, 2], F[1, 2] = -v * s * dt, v * c * dt
-        G = np.array([[c * dt, 0], [s * dt, 0], [0, dt], [0, 0]])
+        G = np.zeros((self.N, 2))
+        G[0, 0], G[1, 0], G[2, 1] = c * dt, s * dt, dt
         sv = self.q['sigma_v_frac'] * abs(v) + self.q['sigma_v_abs'] * (abs(v) > 0.5)
         M = np.diag([sv ** 2, self.q['sigma_wz'] ** 2]) / dt
-        self.P = F @ self.P @ F.T + G @ M @ G.T
+        Q = G @ M @ G.T
+        if self.slip:
+            a = np.exp(-dt / self.slip['tau'])
+            F[0, 4], F[1, 4], F[4, 4] = -v * s * dt, v * c * dt, a
+            self.X[4] *= a
+            Q[4, 4] += self.slip['q'] ** 2 * dt
+        self.P = F @ self.P @ F.T + Q
 
     # --------------------------------------------------------------- updates
     def update(self, z, h, H, R, angle=False):
@@ -65,14 +81,14 @@ class PoseEKF:
         """Measurement of the signed lateral offset n on `lane` (n > 0 = left of the driving direction)."""
         s, n = lane.project(self.X[0], self.X[1], self.X[2])[:2]
         hdg = lane.heading_at(s)[0]
-        H = np.array([[-np.sin(hdg), np.cos(hdg), 0.0, 0.0]])
+        H = self._row(-np.sin(hdg), np.cos(hdg))
         return self.update(n_meas, n[0], H, sigma ** 2)
 
     def update_heading(self, lane, epsi_meas, sigma):
         """Measurement of the heading relative to the lane centreline."""
         s, _ = lane.project(self.X[0], self.X[1], self.X[2])[:2]
         hdg = lane.heading_at(s)[0]
-        return self.update(epsi_meas, wrap(self.X[2] - hdg), np.array([[0, 0, 1.0, 0]]), sigma ** 2, angle=True)
+        return self.update(epsi_meas, wrap(self.X[2] - hdg), self._row(0, 0, 1.0), sigma ** 2, angle=True)
 
     def update_pose(self, x, y, yaw, sigma_xy, sigma_yaw):
         """Absolute pose fix (map-based PnP): z = (x, y, yaw)."""
@@ -93,7 +109,7 @@ class PoseEKF:
 
     def update_relative_yaw(self, dyaw_meas, sigma):
         """Visual rotation since the keyframe: z = yaw - yaw_kf."""
-        return self.update(dyaw_meas, wrap(self.X[2] - self.X[3]), np.array([[0, 0, 1.0, -1.0]]), sigma ** 2, angle=True)
+        return self.update(dyaw_meas, wrap(self.X[2] - self.X[3]), self._row(0, 0, 1.0, -1.0), sigma ** 2, angle=True)
 
     def constrain_to_lane(self, track, margin=0.75, sigma=0.3, sigma_h=np.radians(2), gate_h=np.radians(10), lane_name=None):
         """Map priors on STRAIGHTS only (Lane.straight: |curvature| < 1/500 within +-100 m), where they do

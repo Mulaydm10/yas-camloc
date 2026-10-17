@@ -51,12 +51,17 @@ class OdomEstimator(Estimator):
     source, bounds = 'wheels', False
     # sideslip in the prediction (odometry.Odometry.beta, EXP-0020/0021): gains on the fitted constant and
     # lateral-acceleration terms; 0 = plain unicycle
+    # online sideslip-bias state (TASK D.2, EXP-0026): Gauss-Markov angle added to the travel direction,
+    # learned from the map fixes; sigma0 / q in deg (q per sqrt(s)), tau in s
+    SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S = 0, 0.5, 0.3, 5.0
     BETA0_GAIN, BETA1_GAIN = 0.5, 0.5     # half gain: pooled held-out 0.630 -> 0.586 m, lateral 0.477 -> 0.421 (EXP-0025)
 
     def __init__(self, init, cameras, track):
         super().__init__(init, cameras, track)
         self.odo = Odometry(source=self.source)
-        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'])
+        slip = ({'sigma0': np.radians(self.SLIP_SIGMA0_DEG), 'q': np.radians(self.SLIP_Q_DEG), 'tau': self.SLIP_TAU_S}
+                if self.SLIP_STATE else None)
+        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'], slip=slip)
         self.t = self.t0
 
     def _advance(self, t_ns):
