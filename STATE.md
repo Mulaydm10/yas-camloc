@@ -5,9 +5,9 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 
 ## Done
 - Dataset analysis (`REPORT.md` §0-9), D1 package, D2 odometry + EKF, D3 camera geometry (pivot, §10), D4 visual heading.
-- D5 done: geo-referenced ORB map + PnP fixes fused in the EKF (`--estimator vismap`, `./run.sh`).
-  Held-out validation (map rebuilt without the scored lap, CLAHE map): lap 2 0.905 m, lap 4 0.657 m, lap 6 0.659 m, **pooled 0.78 m, 88 % within 1 m**; pit lane 1.13 m; 22-27 ms/frame on the M4 (EXP-0012..0018, `REPORT.md` §11-12).
-- Devin review (GitHub issue #1) resolved: stress test, CLAHE robustness, strict calibration hold-out (leakage ~0.02 m), build_map leak fixed (`REPORT.md` §12).
+- D5 done: geo-referenced ORB map (CLAHE) + PnP fixes, quality-weighted, fused in the EKF (`--estimator vismap`, `./run.sh`).
+  Held-out validation (map rebuilt without the scored lap): lap 2 0.674 m, lap 4 0.613 m, lap 6 0.577 m, **pooled 0.630 m, lateral 0.477 m, 91.0 % within 1 m** (EXP-0020..0022).
+- Devin review (GitHub issue #1), both rounds: stress test, CLAHE robustness, strict calibration hold-out, lateral-regression ablation, sideslip analysis, fused-state variant + ADR-0003, fresh-clone run.sh test, PDF deliverables (`REPORT.md` §12-13).
 - Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
 - Submission README with results and plots (`docs/`); 19 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
 
@@ -21,16 +21,16 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
 
 ## Next intended step
-1. Back straight failure case (lap 2 lateral jump at the end of the straight): stricter acceptance of a lone fix after a long gap, or more map points there.
-2. Daylight is only proxied by augmentation (EXP-0018); ask the organisers for the test conditions.
-3. Run `./run.sh` on the organisers' test file when it arrives; pass `--init` if it has no `/tf`.
+1. Owner: confirm ADR-0003 (submit allowed-only `vismap`), fill `COMPETITION.md` from the brief (LOCKED: Main Agent), make the slides from `docs/SLIDES.md`.
+2. Lateral: residual bias about -0.2 m (sideslip, EXP-0021); a per-lane or speed-dependent sideslip model that holds on lap 2 too.
+3. Run `./run.sh <test.mcap> submissions/test_poses.csv` when the hidden test file arrives (`-- --init x,y,yaw` if it has no /tf).
 
 ## Latest experiment
-EXP-0018: CLAHE map, held-out pooled 0.78 m and 2-4x more robust map matching; EXP-0017 stress test; EXP-0019 strict hold-out.
+EXP-0022: fix-quality weighting, held-out pooled 0.630 m (91.0 % < 1 m). EXP-0023: fused car state, lateral 0.430 m but weaker in blackouts -> ADR-0003 keeps allowed-only.
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |
 |---|---|---|---|
 | (none) | | | |
 
-Last updated: 2026-10-18 00:45 CEST (by Claude Opus, session national-d2)
+Last updated: 2026-10-18 01:30 CEST (by Claude Opus, session national-d2)

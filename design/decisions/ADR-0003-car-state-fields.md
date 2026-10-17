@@ -24,13 +24,14 @@ forbidden in every reading, and the replay never exposes them.
 ## Evidence (held-out laps 2/4/6 pooled, CLAHE map, threshold 30, quality weighting)
 | variant | position | lateral | heading | within 1 m | 30 s / 60 s blackout, lap 4 |
 |---|---|---|---|---|---|
-| A | **0.630 m** | 0.477 m | 0.26° | **91.0 %** | 2.32 / 2.95 m |
-| B | 0.639 m | **0.430 m** | 0.25° | 87.2 % | see EXP-0023 |
+| A | **0.630 m** | 0.477 m | 0.26° | **91.0 %** | 2.32 / 2.95 m (whole run 2.90 / 4.73 m) |
+| B | 0.639 m | **0.430 m** | 0.25° | 87.2 % | 2.45 / 3.90 m (whole run 3.10 / **9.32 m**) |
 
 ## Decision
 Default and submitted variant: **A**.
 - It is better on the two largest metrics (position and within 1 m), and close on lateral.
 - It carries no rules risk.
+- It degrades more gracefully when map fixes are lost: in a 60 s blackout over the whole run, 4.7 m against 9.3 m.
 - B stays implemented and declared as an option. If the organisers confirm the fused fields are allowed,
   the owner can switch with `./run.sh <test> <out> -- --estimator vismap_est --state ambiguous`.
 

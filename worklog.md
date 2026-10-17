@@ -52,3 +52,11 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - Robustness: query-image augmentations in `tools/vmap_check.py --aug`; CLAHE-normalised map (`build_map --norm`, flag in the map) raises map success under altered images 2-4x and improves the held-out pooled score 0.81 -> 0.78 m (EXP-0018). Now the default in `run.sh`.
 - Strict hold-out: `tools/holdout.py`, `CAMLOC_EXCLUDE_LAPS` / `CAMLOC_ASSETS` (config.ASSETS); leakage about 0.02 m (EXP-0019).
 - `build_map.py` exclusion leak fixed (both frames of a pair checked). 20 tests green. REPORT.md §12 maps each review point to its resolution.
+
+## 2026-10-18 01:30 CEST - Claude (Opus) - Devin review round 2 (EXP-0020..0024, ADR-0003)
+- 2x2 ablation found CLAHE behind the lap 4 lateral regression; threshold back to 30 with the CLAHE map (pooled 0.775 -> 0.673 m).
+- Fix-quality weighting (inliers, reprojection RMS) on by default: pooled 0.630 m, lateral 0.477 m, 91.0 % within 1 m.
+- Lateral bias traced to sideslip (0.23 deg + 0.14 deg per m/s^2 from GT); modelled but off (helps laps 4/6, hurts lap 2).
+- Fused car-state variant `vismap_est`: lateral 0.430 m but worse in blackouts (9.3 m vs 4.7 m whole run) -> ADR-0003 submits allowed-only.
+- Paint/kerb lateral update not built: EXP-0006 showed it is unobservable with these mounts.
+- run.sh: caller-relative paths, `--` option passthrough; fresh-clone test (EXP-0024). submissions/validation, docs/SLIDES.md, README declarations.

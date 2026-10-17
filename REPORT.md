@@ -402,3 +402,16 @@ The plan in §10 point 2 (a landmark map of height structures) became a **geo-re
 | 7 | Rules Q1 | Still open; the allowed-only default is kept | §9 Q1 |
 
 Limit: a real daylight recording has not been tested. The augmentations are only a proxy for it.
+
+---
+
+## 13. Devin review, round 2 (issue #1 comments, 2026-10-18 CEST)
+
+| # | task | outcome | evidence |
+|---|---|---|---|
+| 1 | Lateral regression (lap 4 0.398 → 0.486 m) | The 2×2 ablation shows **CLAHE** causes it (lap 4 lateral 0.42–0.44 plain vs 0.48 CLAHE, at either threshold). Threshold 18 only helped the plain map; with CLAHE, threshold 30 is better (pooled 0.775 → 0.673 m). **Fix-quality weighting** (sigma from inliers and reprojection RMS) brings it to pooled **0.630 m, lateral 0.477 m, 91.0 % within 1 m**. Lap 4 lateral is 0.458 m, still above the 0.40 m goal. | EXP-0020, EXP-0022 |
+| 1b | Where the lateral error comes from | Mostly a **bias** (−0.21 m pooled), concentrated in left turns (−0.64 m whole run). Training GT shows the travel direction leads the heading by 0.23° + 0.14° per m/s² (sideslip). Modelled in the EKF prediction: laps 4/6 improve (lap 4 lateral 0.36 m with the constant term) but lap 2 gets worse every time, so it is **off by default**. | EXP-0021 |
+| 2 | Lateral update from `cl`/`cr` paint, kerbs and borders | **Not built.** EXP-0006 measured this geometry: the cameras sit about 0.2 m above the border paint, so sensitivity is 0.1–1.7 px per metre against 4–6 px of residual noise, i.e. 3–40 m lateral-equivalent noise per camera-frame. A lateral EKF update from it would add noise, not information. Blackout robustness is covered by the map-fix fallback (2.3 / 2.9 m for 30 s / 60 s). | EXP-0006, EXP-0017 |
+| 3 | Rules Q1: fused car state | The brief allows "car state data (accelerations, speed, and other fields)". `vismap_est` (fused speed and yaw rate in the prediction) scores pooled 0.639 m, **lateral 0.430 m**, 87.2 % within 1 m. ADR-0003: submit the allowed-only variant; the fused one is declared as an option. | ADR-0003, EXP-0023 |
+| 4 | Submission path from a fresh clone | `run.sh` now resolves paths relative to the caller and forwards `-- <options>` (for example `--init x,y,yaw`). Fresh clone test: see EXP-0024. | EXP-0024 |
+| 5 | PDF deliverables | `submissions/validation/lap{2,4,6}_scores.txt` (organiser scoring script), `docs/traj_lap*_heldout.png`, `docs/SLIDES.md` (6 slides), README "Declarations". | `submissions/README.md` |

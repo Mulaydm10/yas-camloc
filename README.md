@@ -91,7 +91,7 @@ The organiser scoring-script output for each lap is in `submissions/validation/`
 - **Pit lane:** 1.14 m (whole run, map without lap 6).
 - **Organiser (s, n) scorer:** agrees with the x/y numbers within 1 %. GT (s, n) is re-projected onto
   `map.mcap`, because the training bag's `sn_map_state` does not match it (`REPORT.md` §11).
-- **Speed:** 22–27 ms per frame mean, 35 ms p95, on an Apple M4 CPU (input at 10 Hz). The full 20-minute
+- **Speed:** 20.6 ms per frame mean, 28.4 ms p95, on an Apple M4 CPU, no GPU (input at 10 Hz; measured from a fresh clone, EXP-0024). The full 20-minute
   run takes about 5 minutes.
 
 How we got here (whole run, allowed signals only; `experiments/experiment_log.md`):
