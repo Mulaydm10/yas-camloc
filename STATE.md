@@ -15,13 +15,13 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - (none)
 
 ## Blocked
-- Event facts unknown: fill `COMPETITION.md` (Q-0002); thesis `VISION.md` (Q-0001).
+- `COMPETITION.md` filled from the brief (2026-10-18); still unknown: deadline, dates, team size, roster, upload channel (Q-0002). Thesis `VISION.md` (Q-0001).
 - `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row.
 - Organiser questions: state_estimation fields (REPORT.md §9 Q1, default allowed-only), authoritative (s, n) reference, missing 35 s bag, test-file contents (REPORT.md §11 Q11-13).
 - A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
 
 ## Next intended step
-1. Owner: confirm ADR-0003 (submit allowed-only `vismap`), fill `COMPETITION.md` from the brief (LOCKED: Main Agent), make the slides from `docs/SLIDES.md`.
+1. Owner: make the slides from `docs/SLIDES.md`; add the deadline / dates to `COMPETITION.md`. (ADR-0003 confirmed: submit allowed-only `vismap`.)
 2. Lateral: residual bias about -0.2 m (sideslip, EXP-0021); a per-lane or speed-dependent sideslip model that holds on lap 2 too.
 3. Run `./run.sh <test.mcap> submissions/test_poses.csv` when the hidden test file arrives (`-- --init x,y,yaw` if it has no /tf).
 

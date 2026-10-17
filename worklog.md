@@ -60,3 +60,8 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - Fused car-state variant `vismap_est`: lateral 0.430 m but worse in blackouts (9.3 m vs 4.7 m whole run) -> ADR-0003 submits allowed-only.
 - Paint/kerb lateral update not built: EXP-0006 showed it is unobservable with these mounts.
 - run.sh: caller-relative paths, `--` option passthrough; fresh-clone test (EXP-0024). submissions/validation, docs/SLIDES.md, README declarations.
+
+## 2026-10-18 01:55 CEST - Claude (Opus) - Owner confirmed ADR-0003; COMPETITION.md filled
+- ADR-0003 accepted: the submitted variant is allowed-only `vismap`.
+- COMPETITION.md (LOCKED) filled from the challenge brief as Main Agent on the owner's instruction; audit row in GOVERNANCE.md. Deadline, dates, team size, roster and upload channel are not in the brief and stay TODO(<owner>).
+- notes/judging_alignment.md: every rubric criterion mapped to an artifact.

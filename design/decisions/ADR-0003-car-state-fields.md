@@ -1,6 +1,6 @@
 # ADR-0003: Which car-state fields the submitted localiser uses
 
-- Status: **Accepted (default), owner to confirm the submitted variant**
+- Status: **Accepted** (owner confirmed 2026-10-18 01:55 CEST)
 - Date/time (TZ): 2026-10-18 01:10 CEST
 - Deciders: Claude (Opus) on the owner's instruction to work through the Devin review (GitHub issue #1)
 - Related: REPORT.md §5, §9 Q1, §13; EXP-0004, EXP-0022, EXP-0023
