@@ -28,7 +28,7 @@ Stack: Python 3.12 (ADR-0002). Dataset in `data/` (git-ignored; download steps i
 uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt   # setup
 .venv/bin/python -m pytest -q tests                                     # smoke tests (dataset tests skip without data)
 .venv/bin/python -m camloc.run --out cache/sub.csv [--estimator odom_bounds] [--start S --duration S]   # MCAP -> submission CSV
-#   estimators: hold | odom | odom_bounds | vis (best, allowed signals only) | odom_est[_bounds], vis_est (need --state ambiguous, rules Q1)
+#   estimators: hold | odom | odom_bounds | vis | vismap (best; needs the visual map, see ./run.sh) | odom_est[_bounds], vis_est (need --state ambiguous, rules Q1)
 .venv/bin/python -m camloc.tools.vis_heading_check    # training-time: visual rotation vs GT -> camloc/assets/vis_rot_scale.json
 .venv/bin/python -m camloc.tools.calibrate_odometry   # training-time fit (uses GT) -> camloc/assets/odometry.json
 .venv/bin/python -m camloc.tools.make_masks           # ego-body masks from camloc/assets/body_polygons.json

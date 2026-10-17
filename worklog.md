@@ -38,3 +38,11 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - `run.VisualHeading` (`--estimator vis`): fl/fr/r keyframe rotation, scale-corrected, consensus-gated; tracked lane state with speed-gated pit switching; heading-aware lane projection (`Lane.project(..., yaw)`).
 - Allowed-only whole-run RMSE 55.1 -> 21.5 m (yaw 1.60 deg). 17 tests green.
 - New dataset `23-00-38_cut_120m_update.zip` (SharePoint) not downloaded yet: needs a Microsoft sign-in (Playwright browser opened at the login page).
+
+## 2026-10-17 23:45 CEST - Claude (Opus) - D5 finished: gating, folds, single-camera threshold, speed, submission README (EXP-0012..0016)
+- `run.VisualMapLoc`: NIS gate with recovery, map priors only after 2 s without a fix, `MIN_INL_SINGLE` 30 -> 18; `--set NAME=VALUE` / `--init x,y,yaw` options.
+- `tools/build_map.py` maps the pit lane too (pit lane 6.7 -> 1.05 m). `evaluate.py --sn`: organiser (s, n) scorer with GT re-projected on `map.mcap` (the bag's `sn_map_state` does not match it).
+- Validation, each lap with a map built without it: lap 2 0.947 m, lap 4 0.654 m, lap 6 0.700 m, pooled 0.81 m (86 % within 1 m). Failure case: the feature-poor back straight.
+- Speed: thread pool per camera, decode once, direct CDR image parsing: 38 -> 22 ms/frame, output bit-identical.
+- `run.sh` single entry point (smoke-tested end to end); README results filled; plots in `docs/`; REPORT.md §11 (results, organiser update, questions 11-13).
+- Two Claude sessions overlapped (screen session national-e8 wrote EXP-0012/0013 rows); duplicate row removed, session closed on the user's request. 19 tests green.

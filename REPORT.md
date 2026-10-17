@@ -337,3 +337,52 @@ Measured on the training run (EXP-0005 to EXP-0008). These change the plan in §
    - gantries and bridges, light poles, the barrier/fence top line;
    - a landmark map of these built from the training GT (allowed: training).
 3. Keep the straights-only map priors (§EXP-0004) as the lateral and heading backbone.
+
+---
+
+## 11. Results after D4/D5 and the organiser update (2026-10-17 23:30 CEST)
+
+### Method actually shipped (`--estimator vismap`, `./run.sh`)
+The plan in §10 point 2 (a landmark map of height structures) became a **geo-referenced ORB feature map**:
+- At training time, ORB features in `fl`/`fr`/`r` are triangulated with the GT camera poses (`tools/build_map.py`, whole run including the pit lane).
+- At run time, per-camera PnP + RANSAC against the map near the predicted pose gives absolute (x, y, yaw) fixes.
+- Cross-camera consensus, then an NIS test (χ², 2 dof, 13.8) against the filter's covariance. After 15 consecutive rejections the map is trusted again (the filter is assumed wrong).
+- The fixes are fused into the same EKF as the odometry and the visual heading (D4).
+- The straight-section map priors are applied only when no map fix has arrived for more than 2 s: when used all the time they biased the lateral position (EXP-0012).
+
+### Validation (honest: each lap scored with a map built WITHOUT that lap; causal; allowed signals only)
+
+| held-out lap | pos RMSE | lateral | longitudinal | heading | within 1 m |
+|---|---|---|---|---|---|
+| 4 | 0.654 m | 0.441 | 0.482 | 0.25° | 91.1 % |
+| 6 | 0.700 m | 0.426 | 0.555 | 0.26° | 90.6 % |
+| 2 | 0.947 m | 0.713 | 0.624 | 0.45° | 79.9 % |
+| pooled | 0.81 m | | | | 86 % |
+
+- Final defaults: `SIGMA_XY` 0.6, `MIN_INL_SINGLE` 18.
+- Before the single-camera threshold was lowered from 30 to 18 (EXP-0015), the same three folds gave 0.648 /
+  0.725 / 1.400 m (pooled 1.06 m).
+
+- The organiser (s, n) scorer (`evaluate.py --sn`) gives the same RMSE as the x/y metric on these laps.
+- Whole run, map without lap 6 (other laps in-sample, so optimistic): 0.841 m; pit lane 1.05 m (was 6.7 m before the pit lane entered the map).
+- Progression (whole run, allowed only): hold 528 m → odometry 144 m → +straights priors 55.1 m → +visual heading 21.5 m → +map fixes ≈0.9 m.
+- Speed: 22 ms per frame mean, 35 ms p95, on an Apple M4 (CPU only) for 10 Hz input; the output is bit-identical to the single-threaded version. Per-camera work runs in threads, and the JPEGs are decoded at half resolution, once.
+
+### Failure case: the back straight (lap 2, t ≈ 57–95 s into the lap)
+- Map localisation succeeds in only 19 % (`fr`), 5 % (`fl`) and 5 % (`r`) of frames there, even with a good prior and the lap in the map (33 % for `fr`).
+- The stretch is feature-poor at night, so the filter dead-reckons for about 40 s, and a 1.5° heading error becomes 2–5 m of lateral error.
+- The lane-border prior cannot catch it: the track is about 12 m wide.
+- Laps 4 and 6 cross the same stretch with less drift; the risk is the same in the test.
+- Mitigation: accept a lone-camera fix from 18 PnP inliers instead of 30 (EXP-0015): lap 2 went from 1.40 m to 0.95 m, and a 2–3 m excursion remains.
+
+### Organiser update (`23-00-38_cut_120m_update.zip`)
+- `map.mcap` racing line (2976.875 m) and pit-lane line (2985.489 m), the official (s, n) frame, and a new `tools/evaluate.py` with x/y and s/n scoring.
+- The borders are identical to the training bag's `track_bounds`.
+- Racing-line adherence of the training GT: median lateral 0.6–0.9 m, but p95 up to 8.7 m, so it is useful as a reference, **not** as a hard prior.
+- **The training bag's `sn_map_state` is not consistent with `map.mcap`.** Reconstructing x/y from it is more than 1 m off 98 % of the time. Our s/n scoring therefore recomputes GT (s, n) by projecting GT x/y with the organiser's `Line.xy_to_sn` (`camloc/evaluate.py --sn`).
+- The README mentions a 35 s bag `rosbag_2026-10-12_23-00-38_cut_120m`, which is not in the ZIP.
+
+### New questions for the organisers
+11. Which (s, n) reference is authoritative, given that the training `sn_map_state` does not match `map.mcap`?
+12. Is the 35 s bag `rosbag_2026-10-12_23-00-38_cut_120m` meant to be part of the update? It is missing from the ZIP.
+13. Does the test file contain `/tf` for the first pose? (If not, `camloc.run --init x,y,yaw` takes it.)

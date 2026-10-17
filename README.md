@@ -59,7 +59,41 @@ imports the GT modules.
 
 ## Results
 
-RESULTS_PLACEHOLDER
+All numbers come from the training run with an **honest hold-out**: for each lap the visual map is rebuilt
+**without that lap**, the localiser runs causally over the whole recording using only the allowed car signals,
+and only the held-out lap is scored with the official metric (`camloc/evaluate.py`, which reproduces the
+organiser's `tools/evaluate.py`).
+
+| held-out lap | position RMSE | lateral | longitudinal | heading RMSE | p95 | within 1 m |
+|---|---|---|---|---|---|---|
+| 2 | 0.947 m | 0.713 m | 0.624 m | 0.45° | 2.02 m | 79.9 % |
+| 4 | 0.654 m | 0.441 m | 0.482 m | 0.25° | 1.18 m | 91.1 % |
+| 6 | 0.700 m | 0.426 m | 0.555 m | 0.26° | 1.51 m | 90.6 % |
+| **pooled (3 laps)** | **0.81 m** | | | | | **86 %** |
+
+![lap 4 held out](docs/traj_lap4_heldout.png)
+
+- **Pit lane:** 1.05 m (whole run, map without lap 6).
+- **Organiser (s, n) scorer:** agrees with the x/y numbers within 1 %. GT (s, n) is re-projected onto
+  `map.mcap`, because the training bag's `sn_map_state` does not match it (`REPORT.md` §11).
+- **Speed:** 22 ms per frame mean, 35 ms p95, on an Apple M4 CPU (input at 10 Hz). The full 20-minute run
+  takes 4.8 minutes.
+
+How we got here (whole run, allowed signals only; `experiments/experiment_log.md`):
+
+| step | position RMSE |
+|---|---|
+| hold first pose | 528 m |
+| + wheel / steering odometry | 144 m |
+| + map priors on straights | 55.1 m |
+| + visual heading | 21.5 m |
+| + map-based PnP fixes | ≈1 m |
+| + NIS gate, pit lane in map, lower single-camera threshold | **0.81 m held out** |
+
+**Known failure case.** The back straight (around x ≈ −300, y ≈ 0–130) is feature-poor at night. Map
+localisation succeeds in only 5–19 % of frames there, so the filter dead-reckons. On lap 2 this gives a
+2–3 m lateral excursion (`docs/traj_lap2_heldout.png`). Daylight test conditions have not been validated:
+the training run is at night.
 
 ## Repository
 

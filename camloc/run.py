@@ -219,7 +219,7 @@ class VisualMapLoc(VisualHeading):
     MAP_CAMS = ('fr', 'r', 'fl')
     VMAP = C.ROOT / 'camloc' / 'assets' / 'vmap.npz'
     SIGMA_XY, SIGMA_YAW = 0.6, np.radians(0.4)       # held-out lap 4: median 0.3-0.66 m, 0.17-0.29 deg
-    MIN_INL_SINGLE = 30
+    MIN_INL_SINGLE = 18      # a lone camera fix needs this many PnP inliers (30 -> 18: held-out laps pooled 1.06 -> 0.81 m, EXP-0015)
     AGREE_M = 2.0
 
     def __init__(self, init, cameras, track):

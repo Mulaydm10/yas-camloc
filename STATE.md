@@ -4,31 +4,32 @@ If STATE and `worklog.md` disagree about what is true *now*, STATE wins; the wor
 Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 
 ## Done
-- Repo scaffolded (ADR-0001).
-- Dataset analysis for the Constructor Labs camloc challenge: `REPORT.md`, scripts in `analysis/`, venv `.venv` (Python 3.12).
-- D1 done: `camloc/` package (causal replay, track+pit model, eval harness, run script), ADR-0002 accepted (EXP-0002).
-- D4 done: visual heading (keyframe rotation fl/fr/r) + tracked lane state. Best allowed-only `vis`: 21.5 m whole-run RMSE, yaw 1.60 deg (EXP-0009). 17 tests green.
-- D3 done (pivot): camera self-calibration + map-based attitude kept; lateral-from-paint shown unobservable (EXP-0006), see REPORT.md section 10. 15 tests green.
-- D2 done: calibrated wheel/steering odometry, PoseEKF, straights-only map priors, ego-body masks. Best allowed-only: `odom_bounds` 55.1 m RMSE; ambiguous `odom_est_bounds` 13.8 m (EXP-0003/0004). 
+- Dataset analysis (`REPORT.md` §0-9), D1 package, D2 odometry + EKF, D3 camera geometry (pivot, §10), D4 visual heading.
+- D5 done: geo-referenced ORB map + PnP fixes fused in the EKF (`--estimator vismap`, `./run.sh`).
+  Held-out validation (map rebuilt without the scored lap): lap 2 0.947 m, lap 4 0.654 m, lap 6 0.700 m, **pooled 0.81 m, 86 % within 1 m**; pit lane 1.05 m; 22 ms/frame on the M4 (EXP-0012..0016, `REPORT.md` §11).
+- Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
+- Submission README with results and plots (`docs/`); 19 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
 
 ## In flight
 - (none)
 
 ## Blocked
-- Event facts unknown: fill `COMPETITION.md` (Q-0002).
-- Thesis unknown: fill `VISION.md` (Q-0001).
+- Event facts unknown: fill `COMPETITION.md` (Q-0002); thesis `VISION.md` (Q-0001).
 - `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row.
-- Rules: which state_estimation fields are allowed (REPORT.md §9 Q1). Default: allowed-only.
+- Organiser questions: state_estimation fields (REPORT.md §9 Q1, default allowed-only), authoritative (s, n) reference, missing 35 s bag, test-file contents (REPORT.md §11 Q11-13).
+- A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
 
 ## Next intended step
-Get the organisers to answer the rules question (REPORT.md §9, Q1: which state_estimation fields are allowed). Fill `COMPETITION.md` from `notes/brief/*.pdf`. Then D5: absolute position from height structures (landmark map of gantries/poles/barrier tops from training GT) for s and lateral; analyse the new SharePoint dataset 23-00-38_cut_120m_update.zip once downloaded (needs sign-in).
+1. Back straight failure case (lap 2 lateral jump at the end of the straight): stricter acceptance of a lone fix after a long gap, or more map points there.
+2. Daylight robustness is unvalidated (training run is at night): ask the organisers for the test conditions.
+3. Run `./run.sh` on the organisers' test file when it arrives; pass `--init` if it has no `/tf`.
 
 ## Latest experiment
-EXP-0009: visual heading, allowed-only 21.5 m whole-run RMSE (yaw 1.60 deg)
+EXP-0015: single-camera fix threshold 30 -> 18, held-out pooled 1.06 -> 0.81 m. EXP-0016: speed 38 -> 22 ms/frame, bit-identical.
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |
 |---|---|---|---|
 | (none) | | | |
 
-Last updated: TODO(<owner>) (by TODO(<owner>))
+Last updated: 2026-10-17 23:45 CEST (by Claude Opus, session national-d2)
