@@ -45,3 +45,23 @@ def write_gt_csv(gt, path):
         f.write('timestamp_ns,x,y,z,yaw\n')
         for a, b, c, d in zip(gt['t'], gt['x'], gt['y'], gt['yaw']):
             f.write(f'{int(a)},{b:.4f},{c:.4f},0.0,{d:.6f}\n')
+
+
+def load_gt6(mcap_path=C.DEFAULT_MCAP):
+    """Full 6-DoF GT (t, x, y, z, roll, pitch, yaw, pos_acc) from state_estimation. TRAINING/EVAL ONLY."""
+    path = C.CACHE / 'gt6.npz'
+    if path.exists():
+        z = np.load(path)
+        return {k: z[k] for k in z.files}
+    from .data import _reader, _stamp
+    rows = []
+    with open(mcap_path, 'rb') as f:
+        for _, _, _, m in _reader(f).iter_decoded_messages(topics=[C.STATE_TOPIC]):
+            rows.append((_stamp(m.header), m.x_m, m.y_m, m.z_m, m.roll_rad, m.pitch_rad, m.yaw_rad,
+                         math.hypot(m.pos_accuracy[0], m.pos_accuracy[1])))
+    a = np.array(rows, dtype=np.float64)
+    a = a[np.argsort(a[:, 0])]
+    out = {'t': a[:, 0].astype(np.int64), **{k: a[:, i + 1] for i, k in enumerate(['x', 'y', 'z', 'roll', 'pitch', 'yaw', 'pos_acc'])}}
+    C.CACHE.mkdir(exist_ok=True)
+    np.savez(path, **out)
+    return out

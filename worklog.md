@@ -26,3 +26,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - `camloc/filter.py`: PoseEKF (x, y, yaw) with track-coordinate measurements; straights-only map priors.
 - Masks: automatic extraction (temporal std, median frame difference) failed at night (noise-dominated); hand polygons on mean images in `camloc/assets/body_polygons.json`, rendered by `tools/make_masks.py`.
 - Results: allowed-only 55.1 m, ambiguous 13.8 m whole-run RMSE. 12 tests green.
+
+## 2026-10-17 06:35 CEST - Claude (Opus) - D3: geometry, line measurement, camera self-calibration; plan pivot (EXP-0005..0008)
+- New: `camloc/geometry.py` (projection), `lines.py` (paint detector), `align.py` (chamfer, ground ROI), `measure.py` (near-border residuals), `road.py` (map-based z/roll/pitch), `data.load_bounds3d`.
+- Training tools: `calibrate_cameras.py` (rotations -> camloc/assets/camera_adjust.json), `fit_road_attitude.py`, `overlay_borders.py`, `vo_rotation_check.py`, `lateral_sensitivity.py`.
+- Finding: lateral from ground paint is unobservable (cameras ~0.2 m above the paint). REPORT.md section 10 revises D4/D5: visual rotation for heading, height structures/landmarks for s and lateral.
+- 15 tests green.

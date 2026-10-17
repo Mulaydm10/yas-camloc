@@ -198,6 +198,14 @@ def load_static(mcap_path=C.DEFAULT_MCAP, cams=C.CAMS):
     return cams_out, bounds
 
 
+def load_bounds3d(mcap_path=C.DEFAULT_MCAP):
+    """Track and pit-lane borders as (N, 3) map points (x, y, z), from the latched track_bounds topic."""
+    with open(mcap_path, 'rb') as f:
+        for _, _, _, msg in _reader(f).iter_decoded_messages(topics=[C.BOUNDS_TOPIC]):
+            return {mk.ns: np.array([[p.x, p.y, p.z] for p in mk.points]) for mk in msg.markers}
+    raise RuntimeError('no track_bounds message')
+
+
 def initial_pose(mcap_path=C.DEFAULT_MCAP):
     """The first map -> base_link pose of the run: the ONLY ground truth allowed at inference."""
     with open(mcap_path, 'rb') as f:

@@ -307,3 +307,33 @@ The visual proxies are medians:
 ## Reproduce
 
 See `analysis/README.md`. All derived data goes to `analysis/out/` (git-ignored: it contains GT). Plots go to `analysis/*.png`.
+
+
+---
+
+## 10. Update after D3 (2026-10-17 06:35 CEST): what the camera geometry allows
+
+Measured on the training run (EXP-0005 to EXP-0008). These change the plan in §9.
+
+- **Lateral position from ground paint is geometrically unobservable with these camera mounts.**
+  - The cameras sit about 0.35 m above base_link, and the surveyed border paint about 0.13 m above it. So the lens is only about 0.2 m above the line.
+  - At 7 m to the side, the border is 1.5° below the horizon. A 0.5 m lateral move shifts it by about 1.3 px vertically (full resolution); mostly it slides *along* itself, which can't be observed.
+  - Measured sensitivity is 0.1–1.7 px/m (half resolution) against 4–6 px per-frame residual noise. That is 3–40 m lateral-equivalent per camera-frame, and no use as a measurement.
+  - The inverse-perspective / chamfer-to-borders idea (§9, D3/D4) is therefore dropped for lateral.
+- **Camera self-calibration works and is kept.** Rotations were fitted on near-border residuals with the GT pose, with a 1° prior and a held-out gate:
+  - Biases removed: `cr` +3.05 → +0.86 px, `fr` +4.65 → +1.13 px, `rr` +1.99 → +0.40 px.
+  - Partly reduced: `fl` +5.38 → +2.15 px.
+  - `rl` stays at nominal, which agrees with the README. The corrections are in `camloc/assets/camera_adjust.json`.
+- **Road attitude comes from the map.**
+  - Pitch is 0.99 × the road gradient (0.14° residual). Roll is 1.02 × the road bank (0.50° residual). The car's own body roll from lateral acceleration is negligible.
+  - Implemented in `camloc/road.py` (no GT at inference).
+- **Visual rotation is the well-conditioned camera signal.**
+  - Frame-to-frame rotation from optical flow plus the essential matrix is unbiased (median about 0°, MAD 0.10–0.12° in `fl`/`fr`), but has outliers.
+  - Heading is exactly what the allowed-only odometry lacks: it drifts about 2° per 10 s (EXP-0003). With a good yaw rate (the fused field, EXP-0004) the same filter reaches 13.8 m instead of 55 m.
+
+**Revised D4/D5:**
+1. Heading-bias correction from visual rotation against keyframes 1–2 s back (`fl`/`fr`/`r`; robust, gated), fused into the EKF. Target: close the 55 m → 14 m gap without the ambiguous fields.
+2. Longitudinal *s* and absolute lateral from *structures with height*, whose angular size and position are well conditioned:
+   - gantries and bridges, light poles, the barrier/fence top line;
+   - a landmark map of these built from the training GT (allowed: training).
+3. Keep the straights-only map priors (§EXP-0004) as the lateral and heading backbone.

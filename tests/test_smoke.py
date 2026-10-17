@@ -59,7 +59,9 @@ def test_lane_roundtrip_on_circle():
 
 def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
-    eval_only = {'groundtruth.py', 'evaluate.py', 'calibrate_odometry.py'}   # evaluation / training-time only
+    eval_only = {'groundtruth.py', 'evaluate.py',                                     # evaluation only
+                 'calibrate_odometry.py', 'calibrate_cameras.py', 'overlay_borders.py',   # training-time only
+                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py'}
     for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue
@@ -179,3 +181,45 @@ def test_odometry_params_and_streaming_matches_batch():
     F = {k: np.array([e.fields[k] for e in ev]) for k in ev[0].fields}
     v, wz = batch(t, F, p)
     assert np.allclose(vs, v) and np.max(np.abs(np.array(ws)[60:] - wz[60:])) < 0.02
+
+
+# ------------------------------------------------------------------ D3: geometry, road model, line measurement
+
+def _fake_cam(fx=700.0, w=1506, h=728):
+    from camloc.data import Camera
+    K = np.array([[fx, 0, w / 2], [0, fx, h / 2], [0, 0, 1.0]])
+    T = np.eye(4)
+    T[:3, :3] = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)   # optical z -> base x (looking forward)
+    T[:3, 3] = (0, 0, 1.0)
+    return Camera('t', K, np.zeros(5), w, h, T)
+
+
+def test_projection_of_point_ahead_hits_principal_row_offset():
+    from camloc.geometry import T_map_base, project
+    cam = _fake_cam()
+    uv, idx, depth = project(cam, T_map_base(0, 0, 0, 0, 0, 0), np.array([[10.0, 0, 0.0]]))
+    assert len(uv) == 1 and abs(uv[0, 0] - 753) < 1e-6
+    assert abs(uv[0, 1] - (364 + 700 * 1.0 / 10)) < 1e-6 and abs(depth[0] - 10) < 1e-9   # 1 m below camera at 10 m
+
+
+def test_vertical_residual_finds_a_drawn_line():
+    import cv2
+    from camloc.geometry import T_map_base
+    from camloc.measure import tophat, vertical_residuals
+    cam = _fake_cam()
+    T = T_map_base(0, 0, 0, 0, 0, 0)
+    pts = np.c_[np.full(20, 10.0), np.linspace(-3, 3, 20), np.zeros(20)]     # a lateral line 10 m ahead
+    img = np.full((364, 753, 3), 60, np.uint8)
+    v_true = (364 + 70) * 0.5 + 3                                              # 3 px (half-res) below prediction
+    cv2.line(img, (0, int(v_true)), (752, int(v_true)), (220, 220, 220), 1)
+    r = vertical_residuals(cam, tophat(img), np.ones((364, 753), bool), T, pts)
+    assert len(r) >= 15 and abs(np.median(r[:, 2]) - 3) < 1.0
+
+
+@needs_data
+def test_road_attitude_is_small_and_finite():
+    from camloc.data import load_bounds3d
+    from camloc.road import Road3D
+    road = Road3D(load_bounds3d())
+    z, roll, pitch = road.attitude(7.17, -9.91, 0.126)          # first pose of the training run
+    assert np.isfinite([z, roll, pitch]).all() and abs(roll) < 0.1 and abs(pitch) < 0.1
