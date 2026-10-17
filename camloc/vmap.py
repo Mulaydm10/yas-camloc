@@ -59,17 +59,22 @@ class MapLocalizer:
         self.cams = cameras
         self.Tbc = T_base_cam_adj
         self.masks = {c: (m > 0).astype(np.uint8) * 255 for c, m in masks_half.items()}
-        self.det = orb()
-        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+        # one detector / matcher per camera: OpenCV objects are not thread-safe, cameras run in parallel
+        self.det = {c: orb() for c in self.masks}
+        self.bf = {c: cv2.BFMatcher(cv2.NORM_HAMMING) for c in self.masks}
 
-    def localize(self, cam, gray_half, x, y, yaw, radius=40.0):
+    def features(self, cam, gray_half):
+        """ORB features (pose-independent, so they can be computed while the filter is still updating)."""
+        return detect(self.det[cam], gray_half, self.masks[cam])
+
+    def localize(self, cam, gray_half, x, y, yaw, radius=40.0, feats=None):
         P, D = self.vmap.candidates(cam, x, y, yaw, radius)
         if P is None or len(P) < self.MIN_INLIERS:
             return None
-        uv, des = detect(self.det, gray_half, self.masks[cam])
+        uv, des = feats if feats is not None else self.features(cam, gray_half)
         if len(uv) < self.MIN_INLIERS:
             return None
-        m = self.bf.knnMatch(des, D, k=2)
+        m = self.bf[cam].knnMatch(des, D, k=2)
         good = [a for a, b in (p for p in m if len(p) == 2) if a.distance < 0.8 * b.distance and a.distance < 64]
         if len(good) < self.MIN_INLIERS:
             return None

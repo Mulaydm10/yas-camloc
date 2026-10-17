@@ -248,3 +248,25 @@ def test_heading_aware_projection_rejects_opposite_leg():
     s_east = lane.project(100.0, 6.0, 0.0)[0]         # nearer the westbound leg but heading east
     s_west = lane.project(100.0, 6.0, np.pi)[0]
     assert s_east[0] < 200 < s_west[0]
+
+
+def test_pose_update_pulls_toward_fix_and_shrinks_covariance():
+    from camloc.filter import PoseEKF
+    q = {'sigma_v_frac': 0.04, 'sigma_wz': 0.01, 'sigma_v_abs': 0.2}
+    f = PoseEKF(0, 0, 0, q, p0=(2.0, 2.0, np.radians(2)))
+    P0 = f.P.copy()
+    nis = f.update_pose(1.0, -1.0, np.radians(1), 0.5, np.radians(0.5))
+    assert 0.8 < f.X[0] < 1.0 and -1.0 < f.X[1] < -0.8          # weighted toward the more certain fix
+    assert np.all(np.diag(f.P)[:3] < np.diag(P0)[:3]) and np.all(np.linalg.eigvalsh(f.P) > -1e-12)   # PSD (clone starts fully correlated)
+    assert nis > 0
+    # a fix across the +-pi seam moves the heading the short way round
+    f2 = PoseEKF(0, 0, np.radians(179), q)
+    f2.update_pose(0, 0, np.radians(-179), 0.5, np.radians(0.5))
+    assert abs(wrap(f2.X[2] - np.pi)) < np.radians(1.5)
+
+
+@needs_data
+def test_run_parameter_overrides(tmp_path):
+    from camloc.run import run
+    with pytest.raises(SystemExit):
+        run(C.DEFAULT_MCAP, tmp_path / 'x.csv', 'hold', duration_s=0.5, overrides={'NO_SUCH': '1'})

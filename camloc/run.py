@@ -11,6 +11,7 @@ import argparse
 import json
 import platform
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -110,17 +111,35 @@ class VisualHeading(OdomBounds):
         scales = json.loads((C.ROOT / 'camloc' / 'assets' / 'vis_rot_scale.json').read_text())
         self.scale = {c: scales.get(c, 1.0) for c in self.VIS_CAMS}
         self.kf_t = None
+        # per-camera OpenCV work runs in threads (OpenCV releases the GIL); results do not depend on threading
+        # because each job seeds OpenCV's (thread-local) RANSAC generator itself
+        self.pool = ThreadPoolExecutor(max_workers=6)
+        self._gray_for, self._gray_cache = None, {}
         self.lane = str(track.locate(self.x, self.y, self.yaw)[0][0])
         self.stats = {'updates': 0, 'rejected': 0, 'keyframes': 0, 'lane_switches': 0}
 
+    DECODE_CAMS = VIS_CAMS
+
+    def _gray(self, fs):
+        """Half-resolution grayscale images of DECODE_CAMS, decoded once per frame set, in parallel."""
+        if self._gray_for is not fs:
+            cams = [c for c in self.DECODE_CAMS if c in fs.images]
+            dec = lambda c: self.cv2.imdecode(np.frombuffer(fs.images[c], np.uint8), self.cv2.IMREAD_REDUCED_GRAYSCALE_2)
+            self._gray_cache, self._gray_for = dict(zip(cams, self.pool.map(dec, cams))), fs
+        return self._gray_cache
+
+    def _seeded(self, fn, *a, **kw):
+        self.cv2.setRNGSeed(1)
+        return fn(*a, **kw)
+
     def on_frames(self, fs):
         self._advance(fs.stamp_ns)
-        gray = {c: self.cv2.imdecode(np.frombuffer(fs.images[c], np.uint8), self.cv2.IMREAD_REDUCED_GRAYSCALE_2)
-                for c in self.VIS_CAMS if c in fs.images}
+        gray = {c: g for c, g in self._gray(fs).items() if c in self.VIS_CAMS}
         if self.kf_t is None:
             self._new_keyframe(fs.stamp_ns, gray)
         else:
-            meas = [m[0] / self.scale[c] for c, g in gray.items() if (m := self.kr[c].track(g)) is not None]
+            tracked = self.pool.map(lambda c: self._seeded(self.kr[c].track, gray[c]), list(gray))
+            meas = [m[0] / self.scale[c] for c, m in zip(list(gray), tracked) if m is not None]
             pred = float(np.angle(np.exp(1j * (self.ekf.X[2] - self.ekf.X[3]))))
             sd = float(np.sqrt(self.ekf.P[2, 2] + self.ekf.P[3, 3] - 2 * self.ekf.P[2, 3]))
             good = [d for d in meas if abs(d - pred) < self.GATE + 3 * sd]
@@ -189,8 +208,7 @@ class VisualHeading(OdomBounds):
                     self.stats['lane_switches'] += 1
 
     def _new_keyframe(self, t, gray):
-        for c, g in gray.items():
-            self.kr[c].reset(g)
+        list(self.pool.map(lambda c: self.kr[c].reset(gray[c]), list(gray)))
         self.ekf.clone_heading()
         self.kf_t = t
         self.stats['keyframes'] += 1
@@ -217,19 +235,21 @@ class VisualMapLoc(VisualHeading):
         self.last_fix_t = None
         self.n_reject = 0
 
+    @property
+    def DECODE_CAMS(self):
+        return tuple(dict.fromkeys(self.VIS_CAMS + self.MAP_CAMS))
+
     def on_frames(self, fs):
+        gray = self._gray(fs)
+        cams = [c for c in self.MAP_CAMS if c in gray]
+        feats = {c: self.pool.submit(self.loc.features, c, gray[c]) for c in cams}   # overlaps the heading step
         pose = super().on_frames(fs)
         x, y, yaw = self.ekf.X[:3]
         sd = float(np.sqrt(max(self.ekf.P[0, 0] + self.ekf.P[1, 1], 0)))
         radius = float(np.clip(3 * sd + 25, 40, 150))
-        fixes = []
-        for c in self.MAP_CAMS:
-            if c not in fs.images:
-                continue
-            g = self.cv2.imdecode(np.frombuffer(fs.images[c], np.uint8), self.cv2.IMREAD_REDUCED_GRAYSCALE_2)
-            r = self.loc.localize(c, g, x, y, yaw, radius)
-            if r is not None and abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10):
-                fixes.append(r)
+        feats = {c: f.result() for c, f in feats.items()}
+        res = self.pool.map(lambda c: self._seeded(self.loc.localize, c, gray[c], x, y, yaw, radius, feats[c]), cams)
+        fixes = [r for r in res if r is not None and abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
         use = []
         if len(fixes) >= 2:                      # consensus between cameras
             P = np.array([[f['x'], f['y']] for f in fixes])
