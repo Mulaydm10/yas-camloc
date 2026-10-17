@@ -9,7 +9,7 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 ## Run it
 
 ```bash
-./run.sh <test.mcap | test_dir> <out.csv> [training.mcap]
+./run.sh <test.mcap | test_dir> <out.csv> [training.mcap] [-- extra camloc.run options]
 ```
 
 - `run.sh` creates the Python 3.12 venv from `requirements.txt` if missing.
@@ -17,8 +17,9 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
   the dataset, so it is not committed.
 - It then writes `out.csv` (`timestamp_ns,x,y,yaw`) and `out.run.json`, which holds the per-frame processing
   time and the hardware.
-- If the test file has no `/tf` first pose, pass it with
-  `.venv/bin/python -m camloc.run --mcap … --out … --estimator vismap --init x,y,yaw`.
+- If the test file has no `/tf` first pose, pass it: `./run.sh test.mcap out.csv -- --init x,y,yaw`.
+- The fused car-state variant (ADR-0003, not the default) runs with
+  `./run.sh test.mcap out.csv -- --estimator vismap_est --state ambiguous`.
 
 ## Method (all causal: the pose at t uses only data stamped ≤ t)
 
@@ -52,8 +53,15 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
    - Rotation corrections of 1° or less per camera, fitted on training GT (`tools/calibrate_cameras.py`).
    - Ego-body masks are hand-drawn polygons (`camloc/assets/body_polygons.json`).
 
-Pre-trained models and external data: **none**. The training run's GT is used only at training time (odometry,
-camera and road calibration, the visual map), for scoring, and for the first pose. The test
+**Declarations** (brief, "Minimal requirements"):
+- Pre-trained models: **none**. External or public datasets: **none**.
+- Sensors used at inference: the camera images (`fl`, `fr`, `r`), camera calibration and track borders.
+- Car-state fields used at inference (allowed signals only, ADR-0003): wheel speeds `omega_w_*`, steering
+  `delta_wheel_rad`, and `valid_wheelsspeeds_b`. The fused `state_estimation` speed and yaw rate are **not**
+  used by the default. Pose fields and anything derived from the pose (`x/y/z`, attitude, `sn_map_state`)
+  are never read.
+- The training run's GT is used only at training time (odometry, camera and road calibration, the visual
+  map), for scoring, and for the first pose. The test
 `tests/test_smoke.py::test_inference_modules_do_not_import_groundtruth` enforces that inference code never
 imports the GT modules.
 
@@ -66,18 +74,21 @@ organiser's `tools/evaluate.py`).
 
 | held-out lap | position RMSE | lateral | longitudinal | heading RMSE | p95 | within 1 m |
 |---|---|---|---|---|---|---|
-| 2 | 0.905 m | 0.536 m | 0.729 m | 0.29° | 1.82 m | 86.3 % |
-| 4 | 0.657 m | 0.480 m | 0.449 m | 0.20° | 1.20 m | 86.8 % |
-| 6 | 0.659 m | 0.475 m | 0.456 m | 0.22° | 1.28 m | 90.8 % |
-| **pooled (3 laps)** | **0.78 m** | | | | | **88 %** |
+| 2 | 0.674 m | 0.508 m | 0.443 m | 0.31° | 1.35 m | 90.5 % |
+| 4 | 0.613 m | 0.458 m | 0.407 m | 0.23° | 1.19 m | 89.7 % |
+| 6 | 0.577 m | 0.447 m | 0.366 m | 0.21° | 1.19 m | 92.7 % |
+| **pooled (3 laps)** | **0.630 m** | **0.477 m** | | **0.26°** | | **91.0 %** |
+
+The organiser scoring-script output for each lap is in `submissions/validation/`.
 
 - **Strict hold-out.** Lap 4 is also scored with every calibration (odometry, camera rotations, rotation
-  scales) refitted without it (`tools/holdout.py`): 0.677 m against 0.654 m with the same pipeline, so
-  calibration leakage is about 0.02 m.
+  scales) refitted without it (`tools/holdout.py`): 0.677 m against 0.654 m with the same (earlier)
+  pipeline, so calibration leakage is about 0.02 m.
+- **Fused car-state variant** (ADR-0003): pooled 0.639 m, lateral 0.430 m, 87.2 % within 1 m.
 
 ![lap 4 held out](docs/traj_lap4_heldout.png)
 
-- **Pit lane:** 1.13 m (whole run, map without lap 6).
+- **Pit lane:** 1.14 m (whole run, map without lap 6).
 - **Organiser (s, n) scorer:** agrees with the x/y numbers within 1 %. GT (s, n) is re-projected onto
   `map.mcap`, because the training bag's `sn_map_state` does not match it (`REPORT.md` §11).
 - **Speed:** 22–27 ms per frame mean, 35 ms p95, on an Apple M4 CPU (input at 10 Hz). The full 20-minute
@@ -93,7 +104,8 @@ How we got here (whole run, allowed signals only; `experiments/experiment_log.md
 | + visual heading | 21.5 m |
 | + map-based PnP fixes | ≈1 m |
 | + NIS gate, pit lane in map, lower single-camera threshold | 0.81 m held out |
-| + contrast-normalised (CLAHE) map | **0.78 m held out** |
+| + contrast-normalised (CLAHE) map | 0.78 m held out |
+| + single-camera threshold back to 30 with CLAHE, fix-quality weighting | **0.630 m held out** |
 
 ### Robustness (the test may differ from the night training run)
 
@@ -114,19 +126,23 @@ When a fix succeeds it stays accurate: median 0.4–0.5 m in every case.
 
 | map fixes | lap 4 | whole run |
 |---|---|---|
-| all | 0.65 m | 0.84 m |
-| 50 % dropped at random | 0.70 m | 0.97 m |
-| 90 % dropped at random | 0.88 m | 2.34 m |
-| none for 30 s of every 60 s | 2.48 m | 3.10 m |
-| none for 60 s of every 120 s | 2.86 m | 4.60 m |
+| all (final default) | 0.61 m | 0.81 m |
+| 50 % dropped at random (earlier default) | 0.70 m | 0.97 m |
+| 90 % dropped at random (earlier default) | 0.88 m | 2.34 m |
+| none for 30 s of every 60 s (final default) | 2.32 m | 2.90 m |
+| none for 60 s of every 120 s (final default) | 2.95 m | 4.73 m |
 
 The filter recovers as soon as fixes return. Only a total, permanent map failure would fall back to the
 visual-heading-only result (21.5 m).
 
-**Known failure cases** (`docs/traj_lap2_heldout.png`):
-- The back straight (around x ≈ −300, y ≈ 0–250) is feature-poor at night. With the plain map, lap 2 drifted
-  2–5 m sideways there. The CLAHE map removes that drift, but one 3.7 m along-track step remains for 3 s.
-- Two brief lateral spikes of about 2.5 m occur in the slow corners. A real daylight recording has not been tested; the augmentations above
+**Known failure cases and limits**:
+- **Back straight** (around x ≈ −300, y ≈ 0–250): feature-poor at night. With the plain map, lap 2 drifted
+  2–5 m sideways there. The CLAHE map with the final settings removes that drift (`docs/traj_lap2_heldout.png`).
+- **Residual lateral bias of about −0.2 m.** The car's travel direction leads its heading by a sideslip angle
+  (0.23° + 0.14° per m/s² of lateral acceleration, fitted on GT), and the motion model ignores it. Modelling
+  it helped laps 4 and 6 but not lap 2, so it is off (EXP-0021).
+- **No lateral measurement from paint or kerbs:** with cameras about 0.2 m above the border paint it is
+  geometrically unobservable (EXP-0006). A real daylight recording has not been tested; the augmentations above
 are only a proxy for it.
 
 ## Repository

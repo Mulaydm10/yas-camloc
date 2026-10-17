@@ -5,8 +5,9 @@ Speed:   v = r * w, with w chosen per sample to dodge wheel slip: under braking 
          (use the faster axle), under traction the rears spin (use the front axle).
 Yaw rate (kinematic bicycle with understeer and steering lag):
          wz = v * tan(delta(t - lag) - delta0) / (L * (1 + K * v^2))
-Sideslip:  the direction of travel leads the heading by beta = beta0 + beta1 * v * wz (lateral acceleration);
-         training GT: +1.25 deg median at 5-15 m/s^2 (EXP-0020). Ignoring it biased left turns by -0.6 m.
+Sideslip:  beta0 / beta1 in odometry.json fit the travel direction minus heading = beta0 + beta1 * v * wz on
+         training GT (+1.25 deg median at 5-15 m/s^2). The EKF can use it (run.py BETA0_GAIN / BETA1_GAIN), but
+         it is off by default: on held-out laps it was not consistently better (EXP-0021).
 `source='estimator'` instead uses the fused v_mps / wz_radps fields (allowed by the brief, ADR-0003).
 """
 import json
@@ -43,12 +44,6 @@ class Odometry:
         self.v = 0.0
         self.wz = 0.0
         self.t = None
-
-    @property
-    def beta(self):
-        """Sideslip angle (rad) of the travel direction relative to the heading."""
-        b = self.p.get('beta0', 0.0) + self.p.get('beta1', 0.0) * self.v * self.wz
-        return float(np.clip(b, -np.radians(4), np.radians(4)))
 
     def update(self, stamp_ns, f):
         self.t = stamp_ns

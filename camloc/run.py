@@ -310,7 +310,7 @@ class VisualMapLoc(VisualHeading):
         return self.FIX_PERIOD_S > 0 and ((t_ns - self.t0_stress) / 1e9) % self.FIX_PERIOD_S >= self.FIX_PERIOD_S - self.FIX_GAP_S
 
     # fix quality weighting (EXP-0021): sigma_i = SIGMA_XY * sqrt(Q_REF_INL / inliers) * max(1, rms / Q_REF_RMS)
-    QUALITY_W, Q_REF_INL, Q_REF_RMS = 0, 40.0, 1.5
+    QUALITY_W, Q_REF_INL, Q_REF_RMS = 1, 40.0, 1.5     # on: pooled held-out 0.673 -> 0.630 m, lateral 0.495 -> 0.477
     NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
     REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again
 

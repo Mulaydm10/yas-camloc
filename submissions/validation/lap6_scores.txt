@@ -1,0 +1,88 @@
+# Validation lap 6 (map built WITHOUT lap 6), estimator vismap, allowed signals only, causal
+# x/y scoring: organiser tools/evaluate.py on the lap window (camloc.evaluate --official)
+coverage 99.1 % (ranked), evaluated 1150 / 1150 poses
+
+| group | n | pos RMSE | lat RMSE | lon RMSE | yaw RMSE ° | p95 | ≤1 m % |
+|---|---|---|---|---|---|---|---|
+| **all** (official) | 1150 | 0.577 | 0.447 | 0.366 | 0.21 | 1.19 | 92.7 |
+| GT good (acc ≤ 1 m) | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+| GT blip | 37 | 0.512 | 0.302 | 0.414 | 0.17 | 0.77 | 94.6 |
+| lane track | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+| lane pit | 0 | | | | | | |
+| sector S1 | 96 | 0.411 | 0.212 | 0.352 | 0.16 | 0.70 | 96.9 |
+| sector S2 | 128 | 0.438 | 0.171 | 0.403 | 0.16 | 0.81 | 96.9 |
+| sector S3 | 119 | 0.575 | 0.501 | 0.282 | 0.28 | 0.80 | 100.0 |
+| sector S4 | 82 | 0.412 | 0.183 | 0.369 | 0.11 | 0.69 | 100.0 |
+| sector S5 | 104 | 0.369 | 0.139 | 0.342 | 0.19 | 0.79 | 100.0 |
+| sector S6 | 179 | 0.392 | 0.196 | 0.340 | 0.15 | 0.68 | 98.3 |
+| sector S7 | 144 | 1.147 | 1.037 | 0.489 | 0.38 | 1.93 | 53.5 |
+| sector S8 | 75 | 0.372 | 0.214 | 0.305 | 0.14 | 0.65 | 98.7 |
+| sector S9 | 104 | 0.493 | 0.390 | 0.302 | 0.14 | 0.80 | 99.0 |
+| sector S10 | 82 | 0.396 | 0.180 | 0.353 | 0.17 | 0.75 | 96.3 |
+| speed 0-10 m/s | 50 | 0.278 | 0.110 | 0.255 | 0.18 | 0.52 | 100.0 |
+| speed 10-20 m/s | 230 | 0.872 | 0.755 | 0.436 | 0.31 | 1.88 | 78.3 |
+| speed 20-30 m/s | 410 | 0.570 | 0.436 | 0.367 | 0.20 | 1.03 | 93.9 |
+| speed 30-50 m/s | 423 | 0.382 | 0.199 | 0.326 | 0.15 | 0.69 | 98.3 |
+| lap 6 | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+
+--- tools/evaluate.py on the same window ---
+poses submitted        1150   evaluated 1150
+coverage (1 s bins)    99.1 %   (>= 90 % to be ranked)
+position RMSE  [m]     0.577   <- SCORE (lower is better)
+position median/p95    0.356 / 1.187
+lateral RMSE   [m]     0.447
+longitudinal RMSE [m]  0.366
+yaw RMSE     [deg]     0.211
+within 0.25 m          31.0 %
+within 0.50 m          68.1 %
+within 1.00 m          92.7 %
+
+
+# (s, n) scoring: organiser map.mcap + tools from the 23-00-38 update (camloc.evaluate --sn)
+coverage 99.1 % (ranked), evaluated 1150 / 1150 poses
+
+| group | n | pos RMSE | lat RMSE | lon RMSE | yaw RMSE ° | p95 | ≤1 m % |
+|---|---|---|---|---|---|---|---|
+| **all** (official) | 1150 | 0.577 | 0.447 | 0.366 | 0.21 | 1.19 | 92.7 |
+| GT good (acc ≤ 1 m) | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+| GT blip | 37 | 0.512 | 0.302 | 0.414 | 0.17 | 0.77 | 94.6 |
+| lane track | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+| lane pit | 0 | | | | | | |
+| sector S1 | 96 | 0.411 | 0.212 | 0.352 | 0.16 | 0.70 | 96.9 |
+| sector S2 | 128 | 0.438 | 0.171 | 0.403 | 0.16 | 0.81 | 96.9 |
+| sector S3 | 119 | 0.575 | 0.501 | 0.282 | 0.28 | 0.80 | 100.0 |
+| sector S4 | 82 | 0.412 | 0.183 | 0.369 | 0.11 | 0.69 | 100.0 |
+| sector S5 | 104 | 0.369 | 0.139 | 0.342 | 0.19 | 0.79 | 100.0 |
+| sector S6 | 179 | 0.392 | 0.196 | 0.340 | 0.15 | 0.68 | 98.3 |
+| sector S7 | 144 | 1.147 | 1.037 | 0.489 | 0.38 | 1.93 | 53.5 |
+| sector S8 | 75 | 0.372 | 0.214 | 0.305 | 0.14 | 0.65 | 98.7 |
+| sector S9 | 104 | 0.493 | 0.390 | 0.302 | 0.14 | 0.80 | 99.0 |
+| sector S10 | 82 | 0.396 | 0.180 | 0.353 | 0.17 | 0.75 | 96.3 |
+| speed 0-10 m/s | 50 | 0.278 | 0.110 | 0.255 | 0.18 | 0.52 | 100.0 |
+| speed 10-20 m/s | 230 | 0.872 | 0.755 | 0.436 | 0.31 | 1.88 | 78.3 |
+| speed 20-30 m/s | 410 | 0.570 | 0.436 | 0.367 | 0.20 | 1.03 | 93.9 |
+| speed 30-50 m/s | 423 | 0.382 | 0.199 | 0.326 | 0.15 | 0.69 | 98.3 |
+| lap 6 | 1113 | 0.579 | 0.451 | 0.364 | 0.21 | 1.19 | 92.6 |
+
+--- organiser scorer, x/y + racing-line (s, n) ---
+poses submitted        1150   evaluated 1150
+coverage (1 s bins)    99.1 %   (>= 90 % to be ranked)
+--- map x/y ---
+position RMSE  [m]     0.577   <- SCORE (lower is better)
+position median/p95    0.356 / 1.187
+lateral RMSE   [m]     0.447   bias -0.275
+longitudinal RMSE [m]  0.366   bias -0.012
+yaw RMSE     [deg]     0.211
+within 0.25 m          31.0 %
+within 0.50 m          68.1 %
+within 1.00 m          92.7 %
+--- racing line s/n (all poses) ---
+position RMSE  [m]     0.577   <- SCORE (lower is better)
+position median/p95    0.356 / 1.166
+n (lateral) RMSE  [m]  0.448   bias -0.275
+s (along) RMSE    [m]  0.364   bias -0.015
+epsi RMSE     [deg]    0.359
+within 0.25 m          31.0 %
+within 0.50 m          68.3 %
+within 1.00 m          92.8 %
+
