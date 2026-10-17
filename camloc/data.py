@@ -29,6 +29,20 @@ def _stamp(h):
     return h.stamp.sec * 10**9 + h.stamp.nanosec
 
 
+def _cdr_image(buf):
+    """sensor_msgs/CompressedImage from little-endian CDR -> (stamp_ns, jpeg bytes). The generic mcap_ros2
+    decoder is pure Python and was ~15 % of the run time; this reads the three fields directly."""
+    assert buf[1] == 1, 'expected little-endian CDR'
+    mv = memoryview(buf)
+    sec, nsec, n = np.frombuffer(buf, '<i4', 1, 4)[0], np.frombuffer(buf, '<u4', 1, 8)[0], np.frombuffer(buf, '<u4', 1, 12)[0]
+    o = 16 + int(n)                                   # frame_id (length includes the NUL)
+    o = 4 + ((o - 4 + 3) & ~3)                        # CDR alignment is relative to the 4-byte encapsulation
+    o += 4 + int(np.frombuffer(buf, '<u4', 1, o)[0])  # format
+    o = 4 + ((o - 4 + 3) & ~3)
+    n = int(np.frombuffer(buf, '<u4', 1, o)[0])
+    return int(sec) * 10**9 + int(nsec), bytes(mv[o + 4:o + 4 + n])
+
+
 @dataclass
 class StateEvent:
     stamp_ns: int
@@ -107,13 +121,18 @@ class Replay:
             start = t_first + int(self.start_s * 1e9)
             end = None if self.duration_s is None else start + int(self.duration_s * 1e9)
             pending = []                                   # image events waiting to be grouped
-            for _, ch, m, msg in r.iter_decoded_messages(topics=topics, start_time=start, end_time=end,
-                                                         log_time_order=True):
-                st = _stamp(msg.header)
+            from mcap_ros2.decoder import DecoderFactory
+            decoders, factory = {}, DecoderFactory()
+            for sch, ch, m in r.iter_messages(topics=topics, start_time=start, end_time=end, log_time_order=True):
                 if ch.topic == C.STATE_TOPIC:
+                    if ch.id not in decoders:
+                        decoders[ch.id] = factory.decoder_for(ch.message_encoding, sch)
+                    msg = decoders[ch.id](m.data)
+                    st = _stamp(msg.header)
                     item = ('state', {k: float(getattr(msg, k)) for k in self.fields})
                 else:
-                    item = ('img', cam_of[ch.topic], bytes(msg.data))
+                    st, jpg = _cdr_image(m.data)
+                    item = ('img', cam_of[ch.topic], jpg)
                 for ev in self._emit(merger.push(m.log_time, st, item), pending):
                     yield ev
             for ev in self._emit(merger.flush(), pending, final=True):
