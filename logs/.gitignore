@@ -1,0 +1,4 @@
+# Raw run output stays local; only this file and README.md are tracked.
+*
+!.gitignore
+!README.md

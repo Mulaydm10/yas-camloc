@@ -1,0 +1,25 @@
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+# secrets
+.env
+.env.*
+*.pem
+*.key
+# scratch + logs (whitelisted below)
+scratch/*
+!scratch/.gitignore
+logs/*
+!logs/README.md
+!logs/.gitignore
+
+# dataset (hackathon licence: never commit or upload)
+data/
+.venv/
+__pycache__/
+analysis/out/
+# camera frames from the dataset (licence: no upload) - regenerate with analysis/*.py
+analysis/montage_*.png
+analysis/body_mask.png
