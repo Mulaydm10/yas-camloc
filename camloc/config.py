@@ -1,8 +1,9 @@
 """Paths, topic names and the car-state field policy."""
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MCAP = ROOT / 'data' / 'c0_2026-10-13_22-53-42_camloc' / 'c0_2026-10-13_22-53-42_camloc_0.mcap'
+DEFAULT_MCAP = Path(os.environ.get('CAMLOC_MCAP', ROOT / 'data' / 'c0_2026-10-13_22-53-42_camloc' / 'c0_2026-10-13_22-53-42_camloc_0.mcap'))
 CACHE = ROOT / 'cache'
 
 CAMS = ('fl', 'fr', 'cl', 'cr', 'r', 'rl', 'rr')

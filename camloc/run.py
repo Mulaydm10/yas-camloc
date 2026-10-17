@@ -56,6 +56,9 @@ class OdomEstimator(Estimator):
         self.t = self.t0
 
     def _advance(self, t_ns):
+        if self.t == 0:                      # --init without a stamp: start the clock at the first event
+            self.t = t_ns
+            return
         if t_ns > self.t:
             self.ekf.predict((t_ns - self.t) / 1e9, self.odo.v, self.odo.wz)
             self.t = t_ns
@@ -137,8 +140,12 @@ class VisualHeading(OdomBounds):
                 self._new_keyframe(fs.stamp_ns, gray)
         if self.bounds:
             self._update_lane()
-            self.ekf.constrain_to_lane(self.track, lane_name=self.lane)
+            if self.priors_active(fs.stamp_ns):
+                self.ekf.constrain_to_lane(self.track, lane_name=self.lane)
         return self.ekf.pose
+
+    def priors_active(self, t_ns):
+        return True
 
     PIT_SPEED = 12.0        # m/s; the training run drives the pit lane at a limiter-like 8 m/s, the track at 20-40
     PIT_HOLD_S = 2.0
@@ -207,6 +214,8 @@ class VisualMapLoc(VisualHeading):
         masks = {c: m[::2, ::2][:364, :753] for c, m in load_masks(self.MAP_CAMS).items()}
         self.loc = MapLocalizer(VisualMap(self.VMAP), cameras, Tbc, masks)
         self.stats.update({'map_fixes': 0, 'map_rejected': 0})
+        self.last_fix_t = None
+        self.n_reject = 0
 
     def on_frames(self, fs):
         pose = super().on_frames(fs)
@@ -231,16 +240,34 @@ class VisualMapLoc(VisualHeading):
             use = fixes
         # a lone fix far outside the filter's uncertainty is more likely a wrong place match
         use = [f for f in use if len(use) >= 2 or np.hypot(f['x'] - x, f['y'] - y) < 3 * sd + 8]
-        self.stats['map_rejected'] += len(fixes) - len(use)
         if use:
             mx, my = np.mean([f['x'] for f in use]), np.mean([f['y'] for f in use])
             myaw = float(np.angle(np.mean([np.exp(1j * f['yaw']) for f in use])))
             k = len(use)
-            self.ekf.update_pose(mx, my, myaw, self.SIGMA_XY / np.sqrt(k), self.SIGMA_YAW / np.sqrt(k))
-            self.stats['map_fixes'] += 1
-            if self.bounds:
-                self.ekf.constrain_to_lane(self.track, lane_name=self.lane)
+            sxy, syaw = self.SIGMA_XY / np.sqrt(k), self.SIGMA_YAW / np.sqrt(k)
+            # statistical consistency (NIS, 2-D position) once the filter is confident; repeated consistent
+            # rejections mean the FILTER is wrong, so after REJECT_RESET in a row the fix is accepted anyway
+            Sxy = self.ekf.P[:2, :2] + np.eye(2) * sxy ** 2
+            r = np.array([mx - x, my - y])
+            nis = float(r @ np.linalg.solve(Sxy, r))
+            if nis > self.NIS_GATE and self.n_reject < self.REJECT_RESET:
+                self.n_reject += 1
+                use = []
+            else:
+                self.n_reject = 0
+                self.ekf.update_pose(mx, my, myaw, sxy, syaw)
+                self.stats['map_fixes'] += 1
+                self.last_fix_t = fs.stamp_ns
+        self.stats['map_rejected'] += len(fixes) - len(use)
         return self.ekf.pose
+
+    NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
+    REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again
+
+    PRIOR_AFTER_S = 2.0      # map priors only when map fixes have been missing this long (they bias lateral, EXP-0012)
+
+    def priors_active(self, t_ns):
+        return self.last_fix_t is None or (t_ns - self.last_fix_t) / 1e9 > self.PRIOR_AFTER_S
 
 
 class VisualHeadingEst(VisualHeading):
@@ -253,13 +280,21 @@ ESTIMATORS = {'hold': HoldEstimator, 'odom': OdomEstimator, 'odom_bounds': OdomB
 NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds', 'vis_est'}
 
 
-def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=None, cams=C.CAMS):
+def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=None, cams=C.CAMS, overrides=None,
+        init=None):
     if estimator in NEEDS_AMBIGUOUS and state != 'ambiguous':
         raise SystemExit(f'{estimator} uses fused estimator fields: pass --state ambiguous (rules question Q1)')
     cameras, bounds = load_static(mcap, cams)
     track = TrackModel(bounds)
-    init = initial_pose(mcap)
+    if init is None:
+        init = initial_pose(mcap)                       # first map -> base_link pose of the run (allowed)
+    else:                                               # (x, y, yaw) given explicitly; stamp = first image
+        init = (0, *init)
     est = ESTIMATORS[estimator](init, cameras, track)
+    for k, v in (overrides or {}).items():            # tuning / ablation: estimator class parameters
+        if not hasattr(est, k):
+            raise SystemExit(f'{estimator} has no parameter {k}')
+        setattr(est, k, type(getattr(est, k))(v))
     rows, proc = [], []
     rp = Replay(mcap, cams=cams, state=state, start_s=start_s, duration_s=duration_s)
     n_state = 0
@@ -297,10 +332,14 @@ def main(argv=None):
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--duration', type=float)
     ap.add_argument('--vmap', help='visual map (.npz); default camloc/assets/vmap.npz')
+    ap.add_argument('--set', nargs='*', default=[], metavar='NAME=VALUE', help='override estimator parameters')
+    ap.add_argument('--init', help='initial pose "x,y,yaw" if the test file has no /tf first pose')
     a = ap.parse_args(argv)
     if a.vmap:
         VisualMapLoc.VMAP = Path(a.vmap)
-    print(json.dumps(run(a.mcap, a.out, a.estimator, a.state, a.start, a.duration), indent=1))
+    ov = dict(kv.split('=', 1) for kv in a.set)
+    init = tuple(float(v) for v in a.init.split(',')) if a.init else None
+    print(json.dumps(run(a.mcap, a.out, a.estimator, a.state, a.start, a.duration, overrides=ov, init=init), indent=1))
 
 
 if __name__ == '__main__':

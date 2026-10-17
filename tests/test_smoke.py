@@ -61,7 +61,7 @@ def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
     eval_only = {'groundtruth.py', 'evaluate.py',                                     # evaluation only
                  'calibrate_odometry.py', 'calibrate_cameras.py', 'overlay_borders.py',   # training-time only
-                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py'}
+                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py', 'plot_traj.py'}
     for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue

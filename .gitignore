@@ -26,3 +26,5 @@ analysis/body_mask.png
 cache/
 .pytest_cache/
 .playwright-mcp/
+# training-derived map (dataset licence: not redistributed; ./run.sh rebuilds it)
+camloc/assets/vmap.npz

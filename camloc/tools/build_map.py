@@ -1,6 +1,6 @@
 """TRAINING-TIME: build the geo-referenced visual feature map (uses the GT 6-DoF pose; never at inference).
 
-Every STEP frames (on the laps, GT accuracy <= 0.5 m) each map camera's ORB features are matched to the
+Every STEP frames (whole run incl. the pit lane, GT accuracy <= 0.5 m, excluded laps skipped) each map camera's ORB features are matched to the
 same camera PAIR_GAP frames later; matches are triangulated with the GT camera poses and kept when the
 reprojection error is small in both views, the depth is 3-80 m and the triangulation angle >= 0.5 deg.
 
@@ -75,12 +75,9 @@ def main(argv=None):
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     buf, k = [], 0
     kf_cam, kf_xy, kf_yaw, kf_ptr, Ps, Ds = [], [], [], [0], [], []
-    t_lo, t_hi = min(t for t, _ in use), max(t for _, t in use)
     for ev in Replay(state=None):
-        if not isinstance(ev, FrameSet) or ev.stamp_ns < t_lo:
+        if not isinstance(ev, FrameSet):
             continue
-        if ev.stamp_ns > t_hi:
-            break
         buf.append(ev)
         if len(buf) > PAIR_GAP + 1:
             buf.pop(0)
@@ -88,7 +85,7 @@ def main(argv=None):
         if len(buf) < PAIR_GAP + 1 or k % STEP:
             continue
         e0, e1 = buf[0], buf[-1]
-        if not any(t0 <= e0.stamp_ns <= t1 for t0, t1 in use) or any(t0 <= e0.stamp_ns <= t1 for t0, t1 in excl):
+        if any(t0 <= e0.stamp_ns <= t1 for t0, t1 in excl):
             continue
         for c in MAP_CAMS:
             if c not in e0.images or c not in e1.images:

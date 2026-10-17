@@ -29,6 +29,67 @@ BLIP_ACC_M = 1.0
 N_SECTORS = 10
 SPEED_BINS = (0, 10, 20, 30, 50)
 OFFICIAL = C.ROOT / 'data' / 'c0_2026-10-13_22-53-42_camloc' / 'tools' / 'evaluate.py'
+# organiser update (2026-10-17): racing-line (s, n) frame + scorer; kept under data/ (dataset licence)
+ORG = C.ROOT / 'data' / 'update_23-00-38' / '23-00-38_cut_120m_update'
+
+
+def gt_sn_csv():
+    """GT in the official (s, n) frame: GT x/y/yaw projected on map.mcap's racing / pit-lane lines with the
+    organiser's own Line.xy_to_sn, plus the car's lane flag. (The training bag's own sn_map_state refers to a
+    different reference line: its (s, n) do not reconstruct the car x/y with map.mcap, see EXP-0012.)"""
+    path = C.CACHE / 'gt_sn_proj.csv'
+    if path.exists():
+        return path
+    import sys as _s
+    _s.path.insert(0, str(ORG / 'tools'))
+    from track_frame import load_lines
+    lines = load_lines(str(ORG / 'map.mcap'))
+    car = np.genfromtxt(C.CACHE / 'gt_sn.csv', delimiter=',', names=True)     # tools/extract_gt.py output
+    t = car['timestamp_ns'].astype(np.int64)
+    cols = {}
+    for name, suf in (('track', ''), ('pit', '_pit')):
+        s, n, e, _ = lines[name].xy_to_sn(car['x'], car['y'], car['yaw'], t)
+        cols.update({'s' + suf: s, 'n' + suf: n, 'epsi' + suf: e})
+    with open(path, 'w') as f:
+        f.write('timestamp_ns,x,y,yaw,lane,s,n,epsi,s_pit,n_pit,epsi_pit\n')
+        for i in range(len(t)):
+            f.write(f"{t[i]},{car['x'][i]:.4f},{car['y'][i]:.4f},{car['yaw'][i]:.6f},{int(car['lane'][i])},"
+                    + ','.join(f'{cols[k][i]:.6f}' for k in ('s', 'n', 'epsi', 's_pit', 'n_pit', 'epsi_pit')) + '\n')
+    return path
+
+
+def official_sn(sub_path, windows=None, gt=None):
+    """Organiser scorer (x/y and racing-line s/n) on the submission, optionally restricted to windows."""
+    gtp = gt_sn_csv()
+    with tempfile.TemporaryDirectory() as d:
+        src, gtw = Path(sub_path), Path(gtp)
+        if windows:
+            sub = load_sub(sub_path)
+            m = np.zeros(len(sub['t']), bool)
+            for a, b in windows:
+                m |= (sub['t'] >= a) & (sub['t'] <= b)
+            src = Path(d) / 'sub.csv'
+            with open(src, 'w') as f:
+                f.write('timestamp_ns,x,y,yaw\n')
+                for t, x, y, yaw in zip(sub['t'][m], sub['x'][m], sub['y'][m], sub['yaw'][m]):
+                    f.write(f'{int(t)},{x:.4f},{y:.4f},{yaw:.6f}\n')
+            lines = open(gtp).read().splitlines()
+            keep = [lines[0]] + [l for l in lines[1:] if any(a <= int(l.split(',', 1)[0]) <= b for a, b in windows)]
+            gtw = Path(d) / 'gt.csv'
+            gtw.write_text('\n'.join(keep) + '\n')
+        sn = Path(d) / 'sub_sn.csv'
+        tools = ORG / 'tools'
+        subprocess.run([sys.executable, 'convert.py', 'xy2sn', str(ORG / 'map.mcap'), str(src), str(sn)], cwd=tools,
+                       capture_output=True, text=True, check=True)
+        both = Path(d) / 'both.csv'
+        a = np.genfromtxt(src, delimiter=',', names=True)
+        b = np.genfromtxt(sn, delimiter=',', names=True)
+        with open(both, 'w') as f:
+            f.write('timestamp_ns,x,y,yaw,s,n,epsi\n')
+            for i in range(len(np.atleast_1d(a['timestamp_ns']))):
+                f.write(f"{int(a['timestamp_ns'][i])},{a['x'][i]},{a['y'][i]},{a['yaw'][i]},{b['s'][i]},{b['n'][i]},{b['epsi'][i]}\n")
+        return subprocess.run([sys.executable, 'evaluate.py', str(gtw), str(both)], cwd=tools,
+                              capture_output=True, text=True).stdout
 
 
 def load_sub(path):
@@ -186,6 +247,7 @@ def main(argv=None):
     ap.add_argument('--t1', type=float)
     ap.add_argument('--official', action='store_true')
     ap.add_argument('--json')
+    ap.add_argument('--sn', action='store_true', help='also run the organiser (s, n) scorer (map.mcap racing line)')
     a = ap.parse_args(argv)
     from .data import load_static
     from .track import TrackModel
@@ -204,6 +266,8 @@ def main(argv=None):
     print(fmt(res))
     if a.official:
         print('\n--- tools/evaluate.py on the same window ---\n' + res['official'])
+    if a.sn:
+        print('\n--- organiser scorer, x/y + racing-line (s, n) ---\n' + official_sn(a.sub, windows))
     if a.json:
         Path(a.json).write_text(json.dumps(res, indent=1, default=str))
 
