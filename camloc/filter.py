@@ -73,6 +73,23 @@ class PoseEKF:
         hdg = lane.heading_at(s)[0]
         return self.update(epsi_meas, wrap(self.X[2] - hdg), np.array([[0, 0, 1.0, 0]]), sigma ** 2, angle=True)
 
+    def update_pose(self, x, y, yaw, sigma_xy, sigma_yaw):
+        """Absolute pose fix (map-based PnP): z = (x, y, yaw)."""
+        H = np.zeros((3, self.N))
+        H[0, 0] = H[1, 1] = H[2, 2] = 1.0
+        z = np.array([x, y, yaw])
+        h = self.X[:3].copy()
+        r = z - h
+        r[2] = wrap(r[2])
+        R = np.diag([sigma_xy ** 2, sigma_xy ** 2, sigma_yaw ** 2])
+        S = H @ self.P @ H.T + R
+        K = self.P @ H.T @ np.linalg.inv(S)
+        self.X = self.X + K @ r
+        self.X[2], self.X[3] = wrap(self.X[2]), wrap(self.X[3])
+        I = np.eye(self.N)
+        self.P = (I - K @ H) @ self.P @ (I - K @ H).T + K @ R @ K.T
+        return float(r @ np.linalg.solve(S, r))
+
     def update_relative_yaw(self, dyaw_meas, sigma):
         """Visual rotation since the keyframe: z = yaw - yaw_kf."""
         return self.update(dyaw_meas, wrap(self.X[2] - self.X[3]), np.array([[0, 0, 1.0, -1.0]]), sigma ** 2, angle=True)

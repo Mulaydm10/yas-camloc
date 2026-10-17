@@ -189,12 +189,67 @@ class VisualHeading(OdomBounds):
         self.stats['keyframes'] += 1
 
 
+class VisualMapLoc(VisualHeading):
+    """D5: VisualHeading + absolute pose fixes from the geo-referenced feature map (PnP in fl / fr / r)."""
+    MAP_CAMS = ('fr', 'r', 'fl')
+    VMAP = C.ROOT / 'camloc' / 'assets' / 'vmap.npz'
+    SIGMA_XY, SIGMA_YAW = 0.6, np.radians(0.4)       # held-out lap 4: median 0.3-0.66 m, 0.17-0.29 deg
+    MIN_INL_SINGLE = 30
+    AGREE_M = 2.0
+
+    def __init__(self, init, cameras, track):
+        super().__init__(init, cameras, track)
+        from .align import rot_adjust
+        from .tools.make_masks import load_masks
+        from .vmap import MapLocalizer, VisualMap
+        adj = json.loads((C.ROOT / 'camloc' / 'assets' / 'camera_adjust.json').read_text())
+        Tbc = {c: cameras[c].T_base_cam @ rot_adjust(*adj.get(c, (0, 0, 0))) for c in self.MAP_CAMS}
+        masks = {c: m[::2, ::2][:364, :753] for c, m in load_masks(self.MAP_CAMS).items()}
+        self.loc = MapLocalizer(VisualMap(self.VMAP), cameras, Tbc, masks)
+        self.stats.update({'map_fixes': 0, 'map_rejected': 0})
+
+    def on_frames(self, fs):
+        pose = super().on_frames(fs)
+        x, y, yaw = self.ekf.X[:3]
+        sd = float(np.sqrt(max(self.ekf.P[0, 0] + self.ekf.P[1, 1], 0)))
+        radius = float(np.clip(3 * sd + 25, 40, 150))
+        fixes = []
+        for c in self.MAP_CAMS:
+            if c not in fs.images:
+                continue
+            g = self.cv2.imdecode(np.frombuffer(fs.images[c], np.uint8), self.cv2.IMREAD_REDUCED_GRAYSCALE_2)
+            r = self.loc.localize(c, g, x, y, yaw, radius)
+            if r is not None and abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10):
+                fixes.append(r)
+        use = []
+        if len(fixes) >= 2:                      # consensus between cameras
+            P = np.array([[f['x'], f['y']] for f in fixes])
+            med = np.median(P, axis=0)
+            use = [f for f, p in zip(fixes, P) if np.hypot(*(p - med)) < self.AGREE_M]
+            use = use if len(use) >= 2 else [f for f in fixes if f['n'] >= self.MIN_INL_SINGLE][:1]
+        elif fixes and fixes[0]['n'] >= self.MIN_INL_SINGLE:
+            use = fixes
+        # a lone fix far outside the filter's uncertainty is more likely a wrong place match
+        use = [f for f in use if len(use) >= 2 or np.hypot(f['x'] - x, f['y'] - y) < 3 * sd + 8]
+        self.stats['map_rejected'] += len(fixes) - len(use)
+        if use:
+            mx, my = np.mean([f['x'] for f in use]), np.mean([f['y'] for f in use])
+            myaw = float(np.angle(np.mean([np.exp(1j * f['yaw']) for f in use])))
+            k = len(use)
+            self.ekf.update_pose(mx, my, myaw, self.SIGMA_XY / np.sqrt(k), self.SIGMA_YAW / np.sqrt(k))
+            self.stats['map_fixes'] += 1
+            if self.bounds:
+                self.ekf.constrain_to_lane(self.track, lane_name=self.lane)
+        return self.ekf.pose
+
+
 class VisualHeadingEst(VisualHeading):
     source = 'estimator'
 
 
 ESTIMATORS = {'hold': HoldEstimator, 'odom': OdomEstimator, 'odom_bounds': OdomBounds,
-              'odom_est': OdomEst, 'odom_est_bounds': OdomEstBounds, 'vis': VisualHeading, 'vis_est': VisualHeadingEst}
+              'odom_est': OdomEst, 'odom_est_bounds': OdomEstBounds, 'vis': VisualHeading, 'vis_est': VisualHeadingEst,
+              'vismap': VisualMapLoc}
 NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds', 'vis_est'}
 
 
@@ -241,7 +296,10 @@ def main(argv=None):
     ap.add_argument('--state', default='allowed', choices=['allowed', 'ambiguous'])
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--duration', type=float)
+    ap.add_argument('--vmap', help='visual map (.npz); default camloc/assets/vmap.npz')
     a = ap.parse_args(argv)
+    if a.vmap:
+        VisualMapLoc.VMAP = Path(a.vmap)
     print(json.dumps(run(a.mcap, a.out, a.estimator, a.state, a.start, a.duration), indent=1))
 
 
