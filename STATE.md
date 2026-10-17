@@ -7,6 +7,7 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - Repo scaffolded (ADR-0001).
 - Dataset analysis for the Constructor Labs camloc challenge: `REPORT.md`, scripts in `analysis/`, venv `.venv` (Python 3.12).
 - D1 done: `camloc/` package (causal replay, track+pit model, eval harness, run script), ADR-0002 accepted (EXP-0002).
+- D4 done: visual heading (keyframe rotation fl/fr/r) + tracked lane state. Best allowed-only `vis`: 21.5 m whole-run RMSE, yaw 1.60 deg (EXP-0009). 17 tests green.
 - D3 done (pivot): camera self-calibration + map-based attitude kept; lateral-from-paint shown unobservable (EXP-0006), see REPORT.md section 10. 15 tests green.
 - D2 done: calibrated wheel/steering odometry, PoseEKF, straights-only map priors, ego-body masks. Best allowed-only: `odom_bounds` 55.1 m RMSE; ambiguous `odom_est_bounds` 13.8 m (EXP-0003/0004). 
 
@@ -20,10 +21,10 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - Rules: which state_estimation fields are allowed (REPORT.md §9 Q1). Default: allowed-only.
 
 ## Next intended step
-Get the organisers to answer the rules question (REPORT.md §9, Q1: which state_estimation fields are allowed). Fill `COMPETITION.md` from `notes/brief/*.pdf`. Then revised D4 (REPORT.md section 10): keyframe visual rotation (fl/fr/r) fused into the EKF for heading bias; then a landmark map (gantries, poles, barrier tops) for s and lateral.
+Get the organisers to answer the rules question (REPORT.md §9, Q1: which state_estimation fields are allowed). Fill `COMPETITION.md` from `notes/brief/*.pdf`. Then D5: absolute position from height structures (landmark map of gantries/poles/barrier tops from training GT) for s and lateral; analyse the new SharePoint dataset 23-00-38_cut_120m_update.zip once downloaded (needs sign-in).
 
 ## Latest experiment
-EXP-0006: lateral from ground paint unobservable (0.1-1.7 px/m); EXP-0007: visual rotation unbiased, MAD 0.1 deg
+EXP-0009: visual heading, allowed-only 21.5 m whole-run RMSE (yaw 1.60 deg)
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |

@@ -25,3 +25,4 @@ analysis/montage_*.png
 analysis/body_mask.png
 cache/
 .pytest_cache/
+.playwright-mcp/

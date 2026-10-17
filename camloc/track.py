@@ -99,10 +99,19 @@ class Lane:
         self.straight = kmax < 1 / 500
 
     # ------------------------------------------------------------------ geometry
-    def project(self, x, y, yaw=None):
-        """(x, y[, yaw]) -> s, n[, epsi], plus the perpendicular-projection distance. Vectorised."""
+    def project(self, x, y, yaw=None, max_heading_diff=np.radians(60), k=40):
+        """(x, y[, yaw]) -> s, n[, epsi]. Vectorised. With yaw, only centreline vertices whose direction is
+        within `max_heading_diff` of yaw are candidates, so parallel legs driven the other way (hairpins,
+        pit straight) cannot capture the point; falls back to the plain nearest vertex if none qualifies."""
         p = np.c_[np.atleast_1d(x), np.atleast_1d(y)]
-        _, j = self._tree.query(p)
+        if yaw is None:
+            _, j = self._tree.query(p)
+        else:
+            kk = min(k, len(self.xy))
+            d, jj = self._tree.query(p, k=kk)
+            dh = np.abs(wrap(np.atleast_1d(yaw)[:, None] - self.hdg_v[jj]))
+            cost = np.where(dh < max_heading_diff, d, d + 1e6)
+            j = jj[np.arange(len(p)), np.argmin(cost, axis=1)]
         best = None
         for jj in (j - 1, j):                      # try the segment before and after the nearest vertex
             if self.closed:

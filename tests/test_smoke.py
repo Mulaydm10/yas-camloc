@@ -61,7 +61,7 @@ def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
     eval_only = {'groundtruth.py', 'evaluate.py',                                     # evaluation only
                  'calibrate_odometry.py', 'calibrate_cameras.py', 'overlay_borders.py',   # training-time only
-                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py'}
+                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py'}
     for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue
@@ -223,3 +223,28 @@ def test_road_attitude_is_small_and_finite():
     road = Road3D(load_bounds3d())
     z, roll, pitch = road.attitude(7.17, -9.91, 0.126)          # first pose of the training run
     assert np.isfinite([z, roll, pitch]).all() and abs(roll) < 0.1 and abs(pitch) < 0.1
+
+
+# ------------------------------------------------------------------ D4: heading clone + relative yaw
+
+def test_relative_yaw_update_corrects_heading_drift():
+    from camloc.filter import PoseEKF
+    q = {'sigma_v_frac': 0.04, 'sigma_wz': 0.01, 'sigma_v_abs': 0.2}
+    f = PoseEKF(0, 0, 0, q)
+    f.clone_heading()
+    for _ in range(100):                      # odometry says +0.1 rad/s for 1 s, but truth turned 0.05 rad
+        f.predict(0.01, 10.0, 0.1)
+    f.update_relative_yaw(0.05, np.radians(0.1))
+    assert abs(f.X[2] - 0.05) < 0.01 and abs(f.X[3]) < 1e-6
+    assert np.all(np.linalg.eigvalsh(f.P) > -1e-12)
+
+
+def test_heading_aware_projection_rejects_opposite_leg():
+    from camloc.track import Lane
+    x = np.linspace(0, 200, 201)
+    # hairpin-like: two parallel legs 10 m apart, driven in opposite directions
+    xy = np.vstack([np.c_[x, np.zeros_like(x)], np.c_[x[::-1], np.full_like(x, 10.0)]])
+    lane = Lane('h', xy, True, xy + [0, -3], xy + [0, 3])
+    s_east = lane.project(100.0, 6.0, 0.0)[0]         # nearer the westbound leg but heading east
+    s_west = lane.project(100.0, 6.0, np.pi)[0]
+    assert s_east[0] < 200 < s_west[0]

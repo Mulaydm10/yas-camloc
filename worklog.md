@@ -32,3 +32,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - Training tools: `calibrate_cameras.py` (rotations -> camloc/assets/camera_adjust.json), `fit_road_attitude.py`, `overlay_borders.py`, `vo_rotation_check.py`, `lateral_sensitivity.py`.
 - Finding: lateral from ground paint is unobservable (cameras ~0.2 m above the paint). REPORT.md section 10 revises D4/D5: visual rotation for heading, height structures/landmarks for s and lateral.
 - 15 tests green.
+
+## 2026-10-17 19:30 CEST - Claude (Opus) - D4: visual heading (EXP-0009)
+- `camloc/vision_rot.py` KeyframeRotation; PoseEKF state extended with a heading clone (`clone_heading`, `update_relative_yaw`).
+- `run.VisualHeading` (`--estimator vis`): fl/fr/r keyframe rotation, scale-corrected, consensus-gated; tracked lane state with speed-gated pit switching; heading-aware lane projection (`Lane.project(..., yaw)`).
+- Allowed-only whole-run RMSE 55.1 -> 21.5 m (yaw 1.60 deg). 17 tests green.
+- New dataset `23-00-38_cut_120m_update.zip` (SharePoint) not downloaded yet: needs a Microsoft sign-in (Playwright browser opened at the login page).
