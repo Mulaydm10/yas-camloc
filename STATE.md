@@ -16,17 +16,19 @@ Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Repo is PUBLIC. Owner to
 - Submission README with results and plots (`docs/`); 27 tests green; pushed to github.com/Mulaydm10/yas-camloc (PUBLIC since 2026-10-18, 21:30 CEST).
 
 ## In flight
-- (none) - submission frozen at f314e61 (estimator); run.sh with no flags works on both layouts (submissions/README.md)
+- (none). SUBMISSION-READY and FROZEN: estimator f314e61 (+ writer-only form columns, TASK N); repo PUBLIC; latest commit is the README visual header.
 
 ## Blocked
-- `COMPETITION.md` filled from the brief (2026-10-18); still unknown: deadline, dates, team size, roster, upload channel (Q-0002). Thesis `VISION.md` (Q-0001).
-- `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row.
-- Organiser questions: state_estimation fields (REPORT.md §9 Q1, default allowed-only), authoritative (s, n) reference, missing 35 s bag, test-file contents (REPORT.md §11 Q11-13).
-- Repo is public; Drive links for the videos are in the README Submission section (TASK O). Owner: submit the form.
+- Form field 3 (team members' registration emails): only the owner has them.
+- `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row (low priority).
+- Organiser questions still open: authoritative (s, n) reference, test-file contents (REPORT.md §11 Q11-13).
 
 ## Next intended step
-1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
-2. Deliverables done: submissions/slides.pdf, demo.mp4, demo_script.md (TASK M). FROZEN: estimator f314e61, verified by Devin on the sample (strict lock 0.6 s, 74/74 bins). No more estimator changes; docs only.
+1. OWNER: submit the form before 2026-10-18 23:59 CEST (COMPETITION.md). Field values: team Rogue Ravens; members Tamo Schäfers, Dhruv Mulay, Gagan Karthik Sripuram, Taa-seen Ahmed;
+   repo https://github.com/Mulaydm10/yas-camloc; visualization https://drive.google.com/file/d/1VIL1U20j1YQYrW2CmlARg6J6YRSCXCMO/view?usp=sharing;
+   slides https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/slides.pdf; video https://drive.google.com/file/d/1IMbsoWdDjTM87MPVoOgOlCoiCfW6adw9/view?usp=sharing.
+2. After the deadline: keep links and files stable (jury evaluation 2026-10-19..20). No estimator changes.
+3. Optional: ask Devin for the organiser-sample output CSV to add as a labelled test-domain pose file.
 
 ## Latest experiment
 EXP-0039: pair-free 3-frame provisional lock restored (daylight sample fix); strict 0.513 / 0.303 / 95.1 %; 16/16 starts end correct.
@@ -36,4 +38,4 @@ EXP-0039: pair-free 3-frame provisional lock restored (daylight sample fix); str
 |---|---|---|---|
 | (none) | | | |
 
-Last updated: 2026-10-18 17:50 CEST (by Claude Opus, SSH session)
+Last updated: 2026-10-18 23:20 CEST (by Claude Opus)
