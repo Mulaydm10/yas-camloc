@@ -311,20 +311,29 @@ class VisualMapLoc(VisualHeading):
         ex, ey, eh = self.ekf.X[:3]                   # odometry-propagated frame of reference
         agree = lambda a, b: (np.hypot(a[0] - b[0], a[1] - b[1]) < self.GI_AGREE_M
                               and abs(np.angle(np.exp(1j * (a[2] - b[2])))) < np.radians(self.GI_AGREE_DEG))
-        for i in range(len(hyps)):                    # two cameras agreeing in the same frame
+        cand, pair = None, False                      # this frame's candidate: two cameras agreeing, else the best
+        for i in range(len(hyps)):
             for j in range(i + 1, len(hyps)):
                 a, b = hyps[i], hyps[j]
-                if a['cam'] != b['cam'] and agree((a['x'], a['y'], a['yaw']), (b['x'], b['y'], b['yaw'])):
+                if not pair and a['cam'] != b['cam'] and agree((a['x'], a['y'], a['yaw']), (b['x'], b['y'], b['yaw'])):
                     w = np.array([a['n'], b['n']], float)
-                    return (float(np.average([a['x'], b['x']], weights=w)), float(np.average([a['y'], b['y']], weights=w)),
-                            float(np.angle(w[0] * np.exp(1j * a['yaw']) + w[1] * np.exp(1j * b['yaw']))))
-        best = max(hyps, key=lambda h: h['n']) if hyps else None
-        self._gi_hist.append((t, (ex, ey, eh), None if best is None else (best['x'], best['y'], best['yaw'])))
+                    cand, pair = (float(np.average([a['x'], b['x']], weights=w)), float(np.average([a['y'], b['y']], weights=w)),
+                                  float(np.angle(w[0] * np.exp(1j * a['yaw']) + w[1] * np.exp(1j * b['yaw'])))), True
+        if cand is None and hyps:
+            b = max(hyps, key=lambda h: h['n'])
+            cand = (b['x'], b['y'], b['yaw'])
+        # a single frame, even with two cameras agreeing, can alias to a look-alike place 10-15 m along the track
+        # (EXP-0036): lock only when GI_FRAMES consecutive candidates agree after odometry propagation AND at least
+        # one of them had two cameras agreeing
+        self._gi_hist.append((t, (ex, ey, eh), cand, pair))
         self._gi_hist = self._gi_hist[-self.GI_FRAMES:]
-        if best is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
+        if cand is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
             return None
-        now = (best['x'], best['y'], best['yaw'])
-        for _, (px, py, ph), hp in self._gi_hist[:-1]:  # propagate each past hypothesis by the odometry motion
+        if not any(h[3] for h in self._gi_hist):
+            return None
+        now = cand
+        best = cand
+        for _, (px, py, ph), hp, _p in self._gi_hist[:-1]:  # propagate each past hypothesis by the odometry motion
             c, s_ = np.cos(-ph), np.sin(-ph)
             dx, dy = c * (ex - px) - s_ * (ey - py), s_ * (ex - px) + c * (ey - py)
             prop = (hp[0] + np.cos(hp[2]) * dx - np.sin(hp[2]) * dy, hp[1] + np.sin(hp[2]) * dx + np.cos(hp[2]) * dy,
@@ -335,7 +344,7 @@ class VisualMapLoc(VisualHeading):
 
     def _lock(self, pose, t, reinit):
         x, y, yaw = pose
-        self.ekf = self._make_ekf(x, y, yaw, p0=(1.0, 1.0, np.radians(1.0)))
+        self.ekf = self._make_ekf(x, y, yaw, p0=(3.0, 3.0, np.radians(2.0)))   # honest: a lock can be metres off
         self.lane = str(self.track.locate(x, y, yaw)[0][0])
         self.kf_t, self.last_fix_t, self.n_reject, self.n_cons_reject = None, t, 0, 0
         self._trk, self._gi_hist, self.need_init = {}, [], False
