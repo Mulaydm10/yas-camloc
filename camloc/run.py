@@ -283,6 +283,8 @@ class VisualMapLoc(VisualHeading):
         self.t0_stress = None
         self.need_init = False            # TASK I: set by run() when the run gives no starting pose
         self._gi_hist, self._gi_out, self._nframe, self._gi_best, self._lock_kind = [], None, 0, None, ''
+        self._prov, self._revoked, self._excl_until = None, False, 0
+        self.stats.update({'lock_confirms': 0, 'lock_revokes': 0})
         self.stats.update({'global_init_locks': 0, 'global_init_lock_t_s': None, 'reinit_locks': 0})
 
     @property
@@ -304,13 +306,16 @@ class VisualMapLoc(VisualHeading):
         cams = [c for c in (cams or self.MAP_CAMS) if c in gray]
         res = self.pool.map(lambda c: self._seeded(self.loc.global_localize, c, gray[c]), cams)
         hyps = []
+        excl = getattr(self, '_excl_until', 0) > getattr(self, '_now', 0)
         for r in (h for hs in res for h in hs):
+            if excl and np.hypot(r['x'] - self.ekf.X[0], r['y'] - self.ekf.X[1]) < self.EXCL_M:
+                continue
             lane, s_, n_ = self.track.locate(r['x'], r['y'], r['yaw'])[:3]
             if self.track.lanes[str(lane[0])].inside(s_, n_, self.GI_LANE_MARGIN)[0]:
                 hyps.append(r)
         return hyps
 
-    def _try_lock(self, hyps, t, relaxed=False):
+    def _try_lock(self, hyps, t, relaxed=False, relaxed_only=False):
         """Consensus lock from this frame's hypotheses and the recent history (propagated by odometry)."""
         ex, ey, eh = self.ekf.X[:3]                   # odometry-propagated frame of reference
         agree = lambda a, b: (np.hypot(a[0] - b[0], a[1] - b[1]) < self.GI_AGREE_M
@@ -326,9 +331,10 @@ class VisualMapLoc(VisualHeading):
         if cand is None and hyps:
             b = max(hyps, key=lambda h: h['n'])
             cand = (b['x'], b['y'], b['yaw'])
-        # a single frame, even with two cameras agreeing, can alias to a look-alike place 10-15 m along the track
-        # (EXP-0036): lock only when GI_FRAMES consecutive candidates agree after odometry propagation AND at least
-        # one of them had two cameras agreeing
+        # TASK J: a single-frame two-camera agreement gives a PROVISIONAL lock at once (it can alias to a look-alike
+        # place 10-15 m along the track, EXP-0036); it is confirmed or revoked by the next map fixes
+        if pair and not relaxed_only:
+            return cand
         self._gi_hist.append((t, (ex, ey, eh), cand, pair))
         self._gi_hist = self._gi_hist[-self.GI_FRAMES:]
         if cand is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
@@ -346,6 +352,17 @@ class VisualMapLoc(VisualHeading):
                 return None
         return now
 
+    # provisional-lock bookkeeping (TASK J): confirm after PROV_CONFIRM accepted fixes; revoke when >= PROV_REVOKE
+    # frames with fixes rejected and rejections > 3x acceptances, or the window ends with >= 3 rejected, < 2 accepted
+    PROV_CONFIRM, PROV_REVOKE, PROV_WINDOW_S, EXCL_M, EXCL_S = 2, 6, 8.0, 20.0, 15.0
+
+    def _revoke(self, t):
+        """Wrong lock: search again, excluding the region around the (odometry-propagated) revoked pose."""
+        self.stats['lock_revokes'] += 1
+        self._prov, self.need_init, self._revoked = None, True, True
+        self._excl_until = t + int(self.EXCL_S * 1e9)
+        self._t_first, self._gi_hist, self._gi_best = t, [], None
+
     def _propagate_best(self):
         h, (px, py, ph) = self._gi_best
         ex, ey, eh = self.ekf.X[:3]
@@ -360,6 +377,7 @@ class VisualMapLoc(VisualHeading):
         self.lane = str(self.track.locate(x, y, yaw)[0][0])
         self.kf_t, self.last_fix_t, self.n_reject, self.n_cons_reject = None, t, 0, 0
         self._trk, self._gi_hist, self.need_init, self._gi_best = {}, [], False, None
+        self._prov = {'t': t, 'acc': 0, 'rej': 0}      # every lock is provisional until fixes confirm it
         if reinit:
             self.stats['reinit_locks'] += 1
         else:
@@ -369,6 +387,7 @@ class VisualMapLoc(VisualHeading):
 
     def on_frames(self, fs):
         self._nframe += 1
+        self._now = fs.stamp_ns
         if self.need_init:                            # no pose yet: odometry runs, cameras search the whole map
             if not hasattr(self, '_t_first'):
                 self._t_first = fs.stamp_ns
@@ -395,7 +414,7 @@ class VisualMapLoc(VisualHeading):
             # frame), then the best-supported hypothesis so coverage of the 1-s bins holds
             if (self.GI_EMIT_HYP or el >= self.GI_EMIT_AFTER_S) and self._gi_best is not None:
                 return self._propagate_best()
-            return None
+            return self.ekf.pose if self._revoked else None
         gray = self._gray(fs)
         cams = [c for c in self.MAP_CAMS if c in gray]
         feats = {c: self.pool.submit(self.loc.features, c, gray[c]) for c in cams}   # overlaps the heading step
@@ -407,6 +426,7 @@ class VisualMapLoc(VisualHeading):
         if self._fix_dropped(fs.stamp_ns):
             cams = []
         res = self.pool.map(lambda c: self._seeded(self._cam_fix, c, gray[c], x, y, yaw, radius, feats[c]), cams)
+        accepted = False
         res = [dict(r, cam=c) for c, r in zip(cams, res) if r is not None]
         fixes = [r for r in res if abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
         use, nis, used0 = [], float('nan'), []
@@ -455,6 +475,7 @@ class VisualMapLoc(VisualHeading):
                 self.n_reject = self.n_cons_reject = 0
                 self.ekf.update_pose(mx, my, myaw, sxy, syaw)
                 self.stats['map_fixes'] += 1
+                accepted = True
                 if sc > 0.5:
                     self.last_fix_t = fs.stamp_ns
             elif nis > self.NIS_GATE and not reset:
@@ -469,8 +490,23 @@ class VisualMapLoc(VisualHeading):
                 self.n_reject = self.n_cons_reject = 0
                 self.ekf.update_pose(mx, my, myaw, sxy, syaw)
                 self.stats['map_fixes'] += 1
+                accepted = True
                 self.last_fix_t = fs.stamp_ns
         self.stats['map_rejected'] += len(fixes) - len(use)
+        if self._prov is not None:                    # TASK J: confirm or revoke a provisional lock
+            self._prov['acc'] += int(accepted)
+            self._prov['rej'] += int(bool(fixes) and not accepted)
+            el = (fs.stamp_ns - self._prov['t']) / 1e9
+            a_, r_ = self._prov['acc'], self._prov['rej']
+            if a_ >= self.PROV_CONFIRM:
+                self._prov = None
+                self.stats['lock_confirms'] += 1
+            elif (r_ >= self.PROV_REVOKE and r_ > 3 * a_) or (el > self.PROV_WINDOW_S and r_ >= 3 and a_ < self.PROV_CONFIRM):
+                self._revoke(fs.stamp_ns)
+                return self.ekf.pose
+            elif el > self.PROV_WINDOW_S:             # no evidence either way (fix drought): keep it
+                self._prov = None
+                self.stats['lock_confirms'] += 1
         if self.FIX_LOG:
             self._log_fixes(fs.stamp_ns, x, y, yaw, res, fixes, used0, use, nis)
         if (self.REINIT_S and self.last_fix_t is not None and (fs.stamp_ns - self.last_fix_t) / 1e9 > self.REINIT_S
