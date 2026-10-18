@@ -144,6 +144,9 @@ Spatial changes, which CLAHE cannot undo (TASK G, CLAHE map, success rate per ca
   this predicts under 10 % sharpness loss, so the "V/3 px" rows above are an unphysical worst case.
 - The open risk is therefore **not** speed blur but **anything that removes map fixes** (local glare halves
   them). The fallback then gives 2–5 m (blackout table above).
+- In the full pipeline, floodlight glare on every image costs lap 4 0.46 → 1.12 m (EXP-0034). None of the
+  fallback options tried (gated reset, corner bounds, wheel-scale state, DCS soft gate, LK map-point tracking)
+  beat the default on the strict held-out laps (EXP-0032..0034), so all stay off.
 
 **Losing map fixes.** These are switches for testing only (`--set FIX_DROP=…` / `FIX_GAP_S=… FIX_PERIOD_S=…`):
 
