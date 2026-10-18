@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>camloc slides</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=block" rel="stylesheet">
+<style>
+:root{--page:#F1ECE1;--surface:#F9F6EE;--surface2:#E7E0D1;--well:#ECE5D6;--grid:#E3DCCB;--ink:#211E18;--ink2:#4E4A3F;--ink3:#686457;
+--line:#CFC5AE;--line2:#A99F87;--accent:#2B59D1;--soft:rgba(43,89,209,.10);--peri:#D2DBF4;--ok:#1B6B33;--okt:rgba(27,107,51,.12);
+--warn:#855504;--warnt:rgba(169,112,10,.16);--crit:#B93232;--critt:rgba(199,58,58,.12)}
+@page{size:1920px 1080px;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--page)}
+body{font-family:"Source Serif 4",Georgia,serif;color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.slide{width:1920px;height:1080px;position:relative;overflow:hidden;page-break-after:always;break-after:page;
+ background-color:var(--page);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+ background-size:48px 48px;background-position:-1px -1px}
+.banner{position:absolute;left:0;right:0;top:0;height:56px;background:var(--ink);color:#F1ECE1;display:flex;align-items:center;gap:28px;padding:0 64px;
+ font:600 17px/1 "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase}
+.banner .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:10px}
+.banner .r{margin-left:auto;color:#B9B19E}
+.coord{position:absolute;font:400 14px "JetBrains Mono",monospace;color:var(--ink3);letter-spacing:.1em}
+.frame{position:absolute;left:64px;right:64px;top:96px;bottom:72px}
+.crop{position:absolute;width:22px;height:22px;border-color:var(--line2);border-style:solid;border-width:0}
+.crop.tl{left:40px;top:80px;border-left-width:2px;border-top-width:2px}.crop.tr{right:40px;top:80px;border-right-width:2px;border-top-width:2px}
+.crop.bl{left:40px;bottom:52px;border-left-width:2px;border-bottom-width:2px}.crop.br{right:40px;bottom:52px;border-right-width:2px;border-bottom-width:2px}
+.eyebrow{font:600 18px "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font:400 84px/1.02 "Instrument Serif",serif;letter-spacing:-.01em;margin-top:14px}
+h1 em{font-style:italic;color:var(--accent)}
+h2{font:400 60px/1.05 "Instrument Serif",serif;margin-top:12px}
+h2 em{font-style:italic;color:var(--accent)}
+p,li{font-size:25px;line-height:1.42;color:var(--ink2)}
+.mono{font-family:"JetBrains Mono",monospace}
+.card{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:26px 30px;position:relative}
+.label{font:600 14px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.pill{display:inline-block;border:1.5px dashed var(--line2);border-radius:999px;padding:6px 14px;font:600 14px "JetBrains Mono",monospace;
+ letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);background:var(--surface)}
+.pill.blue{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+.scope{position:absolute;left:64px;right:64px;bottom:20px;font:400 15px/1.35 "JetBrains Mono",monospace;color:var(--ink3)}
+.scope b{color:var(--ink2);font-weight:600}
+.big{font:400 92px/1 "Instrument Serif",serif;color:var(--ink)}
+.big small{font:400 30px "JetBrains Mono",monospace;color:var(--ink3);margin-left:6px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.kpi .label{margin-bottom:12px}
+.kpi.hero{background:var(--ink);border-color:var(--ink)}.kpi.hero .big{color:#F9F6EE}.kpi.hero .label{color:#B9B19E}.kpi.hero .big small{color:#B9B19E}
+table{border-collapse:collapse;width:100%;font:400 22px "JetBrains Mono",monospace}
+td,th{padding:10px 14px;border-bottom:1.5px solid var(--line);text-align:left}
+th{font:600 14px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+td.n{text-align:right}
+.flow{display:flex;align-items:stretch;gap:0}
+.node{background:var(--surface);border:2px solid var(--line2);border-radius:12px;padding:18px 20px;font:400 22px/1.32 "Source Serif 4",serif;color:var(--ink)}
+.node .label{display:block;margin-bottom:6px;font-size:12px}
+.node.acc{border-color:var(--accent);background:var(--peri)}
+.arrow{align-self:center;width:34px;height:2px;background:var(--line2);position:relative;flex:none}
+.arrow:after{content:"";position:absolute;right:-1px;top:-5px;border:6px solid transparent;border-left:9px solid var(--line2)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.crit{color:var(--crit)}
+.tag{display:inline-block;border-radius:8px;padding:3px 10px;font:600 15px "JetBrains Mono",monospace;letter-spacing:.06em}
+.tag.ok{background:var(--okt)}.tag.warn{background:var(--warnt)}.tag.crit{background:var(--critt)}
+ul{list-style:none}
+ul li{position:relative;padding-left:26px;margin:8px 0}
+ul li:before{content:"";position:absolute;left:0;top:15px;width:10px;height:10px;border:2px solid var(--accent);border-radius:2px}
+img{display:block}
+</style>
+</head>
+<body>
+
+<!-- 1 PROBLEM AND RESULT -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>National AI Hackathon 2026</span><span class="r">Sheet 1 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Problem → result</div>
+  <h1>Where is the race car? <em>Cameras only</em>,<br>at race speed, with no start pose.</h1>
+  <p style="margin-top:22px;max-width:1500px">Causal x, y, yaw at 10 Hz from the car's cameras, wheel speeds and steering. No GNSS, no LiDAR, no
+   starting pose given. A geo-referenced visual map, odometry and an EKF, all classical and explainable.</p>
+  <div class="kpis" style="margin-top:44px">
+   <div class="card kpi hero"><div class="label">Position RMSE</div><div class="big">0.51<small>m</small></div></div>
+   <div class="card kpi"><div class="label">Lateral RMSE</div><div class="big">0.30<small>m</small></div></div>
+   <div class="card kpi"><div class="label">Heading RMSE</div><div class="big">0.31<small>°</small></div></div>
+   <div class="card kpi"><div class="label">Poses within 1 m</div><div class="big">95.1<small>%</small></div></div>
+   <div class="card kpi"><div class="label">1-s intervals with a pose</div><div class="big">99.8<small>%</small></div></div>
+   <div class="card kpi"><div class="label">Time per frame · Apple M4 CPU</div><div class="big">24–39<small>ms / 100</small></div></div>
+  </div>
+  <div style="display:flex;gap:14px;margin-top:34px"><span class="pill blue">classical · explainable</span><span class="pill">causal</span><span class="pill">CPU only</span><span class="pill">no pre-trained models</span><span class="pill">no external data</span><span class="pill">no start pose</span></div>
+ </div>
+ <div class="scope"><b>Scope:</b> held-out night laps 2 / 4 / 6 of the training run, pooled; the visual map and every calibration exclude the scored lap; no start pose.
+  Coverage: full training run via <span class="mono">run.sh</span> (no pose during the first 3 s of search). Runtime: mean per frame, full run (24 ms) and 4 parallel folds (39 ms).
+  Not a hidden-test result.</div>
+</section>
+
+<!-- 2 WHY HARD -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Why it's hard</span><span class="r">Sheet 2 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Why not just odometry?</div>
+  <h2>Wheels and steering alone drift <em>hundreds of metres</em>.</h2>
+  <div style="display:flex;gap:30px;margin-top:26px">
+   <div class="card" style="padding:10px;flex:1.55;height:700px;display:flex;align-items:center"><img src="../build/fig_deadreckon.png" style="width:100%"></div>
+   <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+    <div class="card" style="height:204px"><div class="label">Odometry alone · whole run</div><div class="big" style="font-size:76px">107<small>m RMSE</small></div>
+     <p style="font-size:21px;margin-top:8px">up to 263 m off, even starting from the true pose</p></div>
+    <div class="card" style="padding:18px 22px;height:476px"><div class="label">7 cameras · 10 Hz · night</div>
+     <img src="../build/fig_rig.png" style="width:100%;height:290px;object-fit:contain;margin:6px 0">
+     <p style="font-size:19px"><span class="mono" style="color:var(--accent)">fl · fr · r</span> carry the map fixes; the side cameras sit about 0.2 m above the paint, so lateral position from lines is unobservable.</p></div>
+   </div>
+  </div>
+ </div>
+ <div class="scope"><b>Scope:</b> training run, 1195 s, night. Odometry: calibrated wheel speeds + steering (bicycle model), started from the GT pose (display only). Ground truth is drawn for display only. Camera images are not shown (dataset licence: no redistribution).</div>
+</section>
+
+<!-- 3 PIPELINE -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Pipeline</span><span class="r">Sheet 3 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Pipeline · causal, every frame</div>
+  <h2>A known map, odometry and one filter. <em>No neural networks.</em></h2>
+  <div class="flow" style="margin-top:56px;height:330px">
+   <div class="node" style="width:220px"><span class="label">Input</span>Causal MCAP replay: images grouped by stamp, never ahead of time</div><div class="arrow"></div>
+   <div style="display:flex;flex-direction:column;gap:14px;width:330px">
+    <div class="node"><span class="label">Predict</span>Wheel speeds + steering, braking-aware axle choice <span class="mono" style="font-size:15px">(or validation/twist)</span></div>
+    <div class="node"><span class="label">Relative yaw</span>Keyframe rotation: LK flow + essential matrix</div>
+   </div><div class="arrow"></div>
+   <div class="node acc" style="width:300px"><span class="label">Absolute fix</span>CLAHE ORB features → geo-referenced 3D map → PnP + RANSAC per camera, weighted by inliers and reprojection error</div><div class="arrow"></div>
+   <div class="node" style="width:250px"><span class="label">Gate</span>Cross-camera consensus, then a NIS test that recovers if the filter itself is wrong</div><div class="arrow"></div>
+   <div class="node" style="width:290px;border-color:var(--ink);background:var(--ink);color:#F9F6EE"><span class="label" style="color:#B9B19E">EKF</span>x, y, yaw, keyframe yaw, online sideslip · track and pit-lane geometry</div>
+  </div>
+  <div class="card" style="margin-top:56px;display:flex;gap:26px;align-items:center;padding:34px 30px">
+   <div style="width:300px"><div class="label">No start pose</div><h2 style="font-size:40px;margin-top:6px">Find yourself, <em>then check</em>.</h2></div>
+   <div class="flow" style="flex:1">
+    <div class="node" style="flex:1">Global search: descriptor votes over the whole map → PnP on the top 8</div><div class="arrow"></div>
+    <div class="node acc" style="flex:1.1">Provisional lock: 2 cameras agree, or 3 frames agree after odometry</div><div class="arrow"></div>
+    <div class="node" style="flex:1.1">Confirm after 2 accepted fixes, or switch when ≥ 3 rejected fixes agree elsewhere</div><div class="arrow"></div>
+    <div class="node" style="flex:1">Time-boxed search; never silent after 3 s</div>
+   </div>
+  </div>
+ </div>
+ <div class="scope"><b>Declarations:</b> no pre-trained models, no external data. OpenCV ORB / LK / PnP only. Car signals used: wheel speeds, steering, brake pressure (allowed set, ADR-0003). The GT pose and <span class="mono">/tf map→base_link</span> are never read at inference; GT is used only for training-time calibration, the map and scoring.</div>
+</section>
+
+<!-- 4 RESULTS -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Results</span><span class="r">Sheet 4 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Results · held-out laps</div>
+  <h2>Sub-metre on every held-out lap, <em>from any start</em>.</h2>
+  <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:24px;margin-top:22px;height:700px">
+   <div class="card" style="padding:8px;height:700px;display:flex;align-items:center;overflow:hidden"><img src="../build/fig_traj_lap4.png" style="width:100%"></div>
+   <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+    <div class="card" style="padding:8px 20px">
+     <table style="font-size:20px"><tr><th>Held-out lap</th><th class="n">pos RMSE</th><th class="n">lateral</th></tr>
+      <tr><td>Lap 2</td><td class="n">0.598 m</td><td class="n">0.404 m</td></tr>
+      <tr><td>Lap 4 (fastest)</td><td class="n">0.460 m</td><td class="n">0.175 m</td></tr>
+      <tr><td>Lap 6</td><td class="n">0.415 m</td><td class="n">0.206 m</td></tr>
+      <tr><td><b>Pooled</b></td><td class="n"><b>0.513 m</b></td><td class="n"><b>0.303 m</b></td></tr></table></div>
+    <div class="card" style="padding:10px 14px;flex:1;min-height:0;display:flex;flex-direction:column"><div class="label" style="margin:4px 6px">Pooled RMSE by development step</div><img src="../build/fig_progression.png" style="width:100%;flex:1;min-height:0;object-fit:contain"></div>
+    <div class="card" style="padding:14px 20px"><div class="label">16 mid-lap starts, no start pose</div>
+     <p style="font-size:20px;margin-top:4px"><b class="ok">16 / 16 end correct.</b> Lock in 0.0–1.8 s. An aliased lock 13.6 m off <b>switches after 0.3 s</b>; one 9.9 m off converges by 11 s.</p></div>
+   </div>
+  </div>
+ </div>
+ <div class="scope"><b>Scope:</b> night training run, laps 2 / 4 / 6 each held out: the map and every calibration are rebuilt without the scored lap (strict). The progression points before the last one exclude only the scored lap from the map. Mid-lap starts: 40 s windows at 10–90 % of each held-out lap.</div>
+</section>
+
+<!-- 5 ROBUSTNESS AND LIMITS -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Robustness and limits</span><span class="r">Sheet 5 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Robustness · honest limits</div>
+  <h2>What we tested, and <em>where it breaks</em>.</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:44px">
+   <div class="card" style="padding:36px 40px"><div class="label" style="margin-bottom:16px;font-size:16px">Stress tests</div>
+    <table style="font-size:27px">
+     <tr><td style="padding:16px 14px">2 % of map fixes shifted 10 m</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.457 m</span></td></tr>
+     <tr><td style="padding:16px 14px">Twist-only input (test layout)</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.602 m</span></td></tr>
+     <tr><td style="padding:16px 14px">Measured front exposure</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.5–1 ms</span></td></tr>
+     <tr><td style="padding:16px 14px">Motion blur up to ~60 m/s</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">small</span></td></tr>
+     <tr><td style="padding:16px 14px">Mid-lap starts ending correct</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">16 / 16</span></td></tr>
+    </table>
+    <p style="font-size:22px;margin-top:22px">Wrong-fix test: lap 4. Twist: pooled held-out laps. Blur at 60 m/s is extrapolated from the measured exposure.</p></div>
+   <div class="card" style="padding:36px 40px"><div class="label" style="margin-bottom:16px;font-size:16px">Limits</div>
+    <table style="font-size:27px">
+     <tr><td style="padding:16px 14px">30 s without map fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">2.7 m</span></td></tr>
+     <tr><td style="padding:16px 14px">60 s without map fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag crit">5.2 m</span></td></tr>
+     <tr><td style="padding:16px 14px">Aliased start: time to correct</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">0.3–11 s</span></td></tr>
+     <tr><td style="padding:16px 14px">Daylight sample: accepted fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">11 in 74 s</span></td></tr>
+     <tr><td style="padding:16px 14px">Lateral from paint (0.2 m height)</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag crit">unobservable</span></td></tr>
+    </table>
+    <p style="font-size:22px;margin-top:22px">Blackouts: lap 4, RMSE over the window. The daylight sample has no GT: a structural check only (locks at 0.6 s, 74 / 74 one-second bins). Daylight against a night map means sparse fixes, so more dead reckoning.</p></div>
+  </div>
+ </div>
+ <div class="scope"><b>Scope:</b> all numbers from the night training run with held-out laps, except the organisers' daylight sample (structural check, no ground truth, never used for tuning). Experiments EXP-0030–0039 in <span class="mono">experiments/experiment_log.md</span>.</div>
+</section>
+
+<!-- 6 REPRODUCIBILITY -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Reproducibility and rules</span><span class="r">Sheet 6 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Run it</div>
+  <h2>One command, <em>both topic layouts</em>.</h2>
+  <div class="card" style="margin-top:30px;background:var(--ink);border-color:var(--ink);padding:44px 48px">
+   <div class="mono" style="font-size:44px;color:#F9F6EE">$ ./run.sh test.mcap out.csv</div>
+   <div class="mono" style="font-size:19px;color:#B9B19E;margin-top:12px">→ out.csv (timestamp_ns, x, y, yaw) + out.run.json (per-frame time, hardware). Builds the venv and the visual map on first use.</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px">
+   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Validation</div><ul><li>Strict leave-one-lap-out: map + calibration</li><li>Causal processing, image stamps only</li><li>GT pose never read at inference</li></ul></div>
+   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Engineering</div><ul><li>26 automated tests</li><li>Python 3.10–3.12, CPU only</li><li>Training and test-domain layouts</li></ul></div>
+   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Traceable</div><ul><li>39 logged experiments (EXP-####)</li><li>Decisions as ADRs</li><li>Independent reviewer loop</li></ul></div>
+  </div>
+  <div style="display:flex;gap:22px;margin-top:48px;align-items:center">
+   <span class="pill blue" style="font-size:24px;padding:12px 24px">github.com/Mulaydm10/yas-camloc</span>
+   <span class="pill" style="font-size:24px;padding:12px 24px">TEAM: &lt;names — owner fills in&gt;</span>
+  </div>
+ </div>
+ <div class="scope"><b>Scope:</b> <span class="mono">run.sh</span> with no flags was checked on the full training run and on a 60 s test-domain cut (no state_estimation, /tf or track_bounds; speed and yaw rate from validation/twist).</div>
+</section>
+
+</body>
+</html>

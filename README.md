@@ -78,11 +78,14 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 - Pre-trained models: **none**. External or public datasets: **none**.
 - Sensors used at inference: the camera images (`fl`, `fr`, `r`), camera calibration and track borders.
 - Car-state fields used at inference (allowed signals only, ADR-0003): wheel speeds `omega_w_*`, steering
-  `delta_wheel_rad`, and `valid_wheelsspeeds_b`. The fused `state_estimation` speed and yaw rate are **not**
+  `delta_wheel_rad`, brake pressure `brake` (to choose the axle under braking) and
+  `valid_wheelsspeeds_b`. In the test-domain layout, `/constructor0/validation/twist` supplies speed and yaw
+  rate instead. The fused `state_estimation` speed and yaw rate are **not**
   used by the default. Pose fields and anything derived from the pose (`x/y/z`, attitude, `sn_map_state`)
   are never read.
 - The training run's GT is used only at training time (odometry, camera and road calibration, the visual
-  map), for scoring, and for the first pose. The test
+  map) and for scoring. No starting pose is read: the localiser initialises itself (`--gt-init` exists for
+  validation only). The test
 `tests/test_smoke.py::test_inference_modules_do_not_import_groundtruth` enforces that inference code never
 imports the GT modules.
 
