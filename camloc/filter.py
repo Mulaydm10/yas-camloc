@@ -14,15 +14,20 @@ from .track import wrap
 class PoseEKF:
     """State X = [x, y, yaw, yaw_kf(, slip)]. yaw_kf is a stochastic clone of the heading at the last visual
     keyframe (static in prediction), so relative visual rotation "yaw - yaw_kf" can be fused consistently.
-    Optional `slip` (dict sigma0, q, tau): a sideslip-angle bias state added to the travel direction, a
-    first-order Gauss-Markov process learned online from the absolute fixes (TASK D.2, EXP-0026)."""
+    Optional `slip` (dict sigma0, q, tau[, c_sigma0, c_q, clip, c_clip]): sideslip states added to the travel
+    direction, first-order Gauss-Markov processes learned online from the absolute fixes (TASK D.2, EXP-0026):
+    b (rad), and with c_* also c (rad per m/s^2 of lateral acceleration a_y = v * wz), so the travel direction
+    is heading + beta + b + c * a_y. q_lat (m per sqrt(m)) adds lateral process noise scaled with distance."""
     N = 4
 
     def __init__(self, x, y, yaw, q, p0=(0.05, 0.05, np.radians(0.5)), slip=None):
         self.slip = slip
-        self.N = 5 if slip else 4
-        self.X = np.array([x, y, yaw, yaw] + ([0.0] if slip else []), float)
-        self.P = np.diag(np.square([*p0, p0[2]] + ([slip['sigma0']] if slip else [])))
+        self.nc = 1 if slip and slip.get('c_sigma0') else 0
+        self.N = 4 + (1 + self.nc if slip else 0)
+        extra = ([slip['sigma0']] + ([slip['c_sigma0']] if self.nc else [])) if slip else []
+        self.X = np.array([x, y, yaw, yaw] + [0.0] * len(extra), float)
+        self.P = np.diag(np.square([*p0, p0[2]] + extra))
+        self.q_lat = 0.0
         self.P[2, 3] = self.P[3, 2] = self.P[2, 2]
         self.q = q
 
@@ -44,7 +49,10 @@ class PoseEKF:
         if dt <= 0:
             return
         x, y, h = self.X[:3]
-        hm = h + 0.5 * wz * dt + beta + (self.X[4] if self.slip else 0.0)
+        ay = v * wz
+        hm = h + 0.5 * wz * dt + beta
+        if self.slip:
+            hm += self.X[4] + (self.X[5] * ay if self.nc else 0.0)
         c, s = np.cos(hm), np.sin(hm)
         self.X[:3] = [x + v * c * dt, y + v * s * dt, wrap(h + wz * dt)]
         F = np.eye(self.N)
@@ -59,6 +67,13 @@ class PoseEKF:
             F[0, 4], F[1, 4], F[4, 4] = -v * s * dt, v * c * dt, a
             self.X[4] *= a
             Q[4, 4] += self.slip['q'] ** 2 * dt
+            if self.nc:
+                F[0, 5], F[1, 5], F[5, 5] = -v * s * dt * ay, v * c * dt * ay, a
+                self.X[5] *= a
+                Q[5, 5] += self.slip['c_q'] ** 2 * dt
+        if self.q_lat:
+            n = np.array([-s, c])
+            Q[:2, :2] += np.outer(n, n) * self.q_lat ** 2 * abs(v) * dt
         self.P = F @ self.P @ F.T + Q
 
     # --------------------------------------------------------------- updates
@@ -75,6 +90,7 @@ class PoseEKF:
         self.X[3] = wrap(self.X[3])
         I = np.eye(self.N)
         self.P = (I - K @ H) @ self.P @ (I - K @ H).T + K @ R @ K.T      # Joseph form
+        self._clip_slip()
         return float(r @ np.linalg.solve(S, r))                          # NIS
 
     def update_lateral(self, lane, n_meas, sigma):
@@ -105,7 +121,15 @@ class PoseEKF:
         self.X[2], self.X[3] = wrap(self.X[2]), wrap(self.X[3])
         I = np.eye(self.N)
         self.P = (I - K @ H) @ self.P @ (I - K @ H).T + K @ R @ K.T
+        self._clip_slip()
         return float(r @ np.linalg.solve(S, r))
+
+    def _clip_slip(self):
+        if self.slip:
+            if self.slip.get('clip'):
+                self.X[4] = np.clip(self.X[4], -self.slip['clip'], self.slip['clip'])
+            if self.nc and self.slip.get('c_clip'):
+                self.X[5] = np.clip(self.X[5], -self.slip['c_clip'], self.slip['c_clip'])
 
     def update_relative_yaw(self, dyaw_meas, sigma):
         """Visual rotation since the keyframe: z = yaw - yaw_kf."""

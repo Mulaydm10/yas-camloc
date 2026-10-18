@@ -29,6 +29,12 @@ from .calibrate_cameras import collect, fit, residuals
 from .make_masks import load_masks
 
 CAMS = ('cl', 'cr', 'fl', 'fr')
+# --search-px N widens the residual search window (measure.SEARCH_PX, half-res px); results go to a suffixed json
+import sys as _sys
+from .. import measure as _measure
+if '--search-px' in _sys.argv:
+    _measure.SEARCH_PX = int(_sys.argv[_sys.argv.index('--search-px') + 1])
+OUT_NAME = f'camera_height_fit_s{_measure.SEARCH_PX}.json' if '--search-px' in _sys.argv else 'camera_height_fit.json'
 DH = np.round(np.arange(-0.3, 0.71, 0.1), 2)
 
 
@@ -78,6 +84,7 @@ def sensitivity(cam, frames, c, a, dh):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--frames', type=int, default=320)
+    ap.add_argument('--search-px', type=int)
     a = ap.parse_args(argv)
     cameras, bounds = load_static()
     tm = TrackModel(bounds)
@@ -128,7 +135,7 @@ def main(argv=None):
                      'lateral_equiv_noise_m_per_point': noise / sens if sens > 0 else None, 'rows': rows}
         print(f'==> {c}: best dh {best[0]:+.1f} m (90 % CI {lo:+.1f}..{hi:+.1f}), sensitivity {sens0:.2f} -> {sens:.2f} px/m, '
               f'point noise ~{noise:.1f} px -> {noise / sens if sens > 0 else float("nan"):.1f} m lateral-equivalent per point')
-    (C.CACHE / 'camera_height_fit.json').write_text(json.dumps(report, indent=1))
+    (C.CACHE / OUT_NAME).write_text(json.dumps(report, indent=1))
 
 
 if __name__ == '__main__' and '--scan' not in __import__('sys').argv:
@@ -158,7 +165,7 @@ def lateral_scan(cam, frames, c, ang, dh, deltas=np.round(np.arange(-1.5, 1.51, 
 
 
 def scan_main():
-    rep = json.loads((C.CACHE / 'camera_height_fit.json').read_text())
+    rep = json.loads((C.CACHE / OUT_NAME).read_text())
     cameras, bounds = load_static()
     tm = TrackModel(bounds)
     masks = {c: m[::2, ::2][:364, :753] for c, m in load_masks().items()}
@@ -178,7 +185,7 @@ def scan_main():
                   f'robust std {mad:.2f} m, RMS {np.sqrt(np.mean(e ** 2)):.2f} m, |err|<0.3 m: {np.mean(np.abs(e) < 0.3) * 100:.0f} %')
             rep[c][f'scan_dh{dh:+.1f}'] = {'median_m': float(np.median(e)), 'robust_std_m': float(mad),
                                            'rms_m': float(np.sqrt(np.mean(e ** 2))), 'n': int(len(e))}
-    (C.CACHE / 'camera_height_fit.json').write_text(json.dumps(rep, indent=1))
+    (C.CACHE / OUT_NAME).write_text(json.dumps(rep, indent=1))
 
 
 if __name__ == '__main__' and __import__('sys').argv[1:2] == ['--scan']:

@@ -297,3 +297,21 @@ def test_slip_state_learns_a_constant_sideslip_from_position_fixes():
         f.update_pose(x, y, 0.0, 0.3, np.radians(0.2))
     assert abs(f.X[4] - true_beta) < np.radians(0.3)
     assert f.P.shape == (5, 5) and np.all(np.linalg.eigvalsh(f.P) > -1e-12)
+
+
+@needs_data
+def test_overrides_reach_the_constructor(tmp_path):
+    """--set must act before __init__ (the EKF and its slip state are built there)."""
+    from camloc import run as R
+    seen = {}
+    orig = R.PoseEKF.__init__
+
+    def spy(self, *a, **kw):
+        seen['slip'] = kw.get('slip')
+        orig(self, *a, **kw)
+    R.PoseEKF.__init__ = spy
+    try:
+        R.run(C.DEFAULT_MCAP, tmp_path / 'x.csv', 'odom', duration_s=0.3, overrides={'SLIP_STATE': '1'})
+    finally:
+        R.PoseEKF.__init__ = orig
+    assert seen['slip'] is not None

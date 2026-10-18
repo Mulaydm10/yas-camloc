@@ -53,15 +53,23 @@ class OdomEstimator(Estimator):
     # lateral-acceleration terms; 0 = plain unicycle
     # online sideslip-bias state (TASK D.2, EXP-0026): Gauss-Markov angle added to the travel direction,
     # learned from the map fixes; sigma0 / q in deg (q per sqrt(s)), tau in s
-    SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S = 0, 0.5, 0.3, 5.0
+    # SLIP_STATE 1 = b only, 2 = b + c * a_y; clips in deg and deg per m/s^2; Q_LAT lateral process noise
+    SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S, SLIP_CLIP_DEG = 0, 0.5, 0.3, 5.0, 3.0
+    SLIP_C_SIGMA0_DEG, SLIP_C_Q_DEG, SLIP_C_CLIP_DEG, Q_LAT = 0.15, 0.03, 0.3, 0.0
     BETA0_GAIN, BETA1_GAIN = 0.5, 0.5     # half gain: pooled held-out 0.630 -> 0.586 m, lateral 0.477 -> 0.421 (EXP-0025)
 
     def __init__(self, init, cameras, track):
         super().__init__(init, cameras, track)
         self.odo = Odometry(source=self.source)
-        slip = ({'sigma0': np.radians(self.SLIP_SIGMA0_DEG), 'q': np.radians(self.SLIP_Q_DEG), 'tau': self.SLIP_TAU_S}
-                if self.SLIP_STATE else None)
+        slip = None
+        if self.SLIP_STATE:
+            slip = {'sigma0': np.radians(self.SLIP_SIGMA0_DEG), 'q': np.radians(self.SLIP_Q_DEG), 'tau': self.SLIP_TAU_S,
+                    'clip': np.radians(self.SLIP_CLIP_DEG)}
+            if self.SLIP_STATE >= 2:     # Devin's refinement: b + c * a_y
+                slip.update({'c_sigma0': np.radians(self.SLIP_C_SIGMA0_DEG), 'c_q': np.radians(self.SLIP_C_Q_DEG),
+                             'c_clip': np.radians(self.SLIP_C_CLIP_DEG)})
         self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'], slip=slip)
+        self.ekf.q_lat = self.Q_LAT
         self.t = self.t0
 
     def _advance(self, t_ns):
@@ -370,11 +378,13 @@ def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=No
         init = initial_pose(mcap)                       # first map -> base_link pose of the run (allowed)
     else:                                               # (x, y, yaw) given explicitly; stamp = first image
         init = (0, *init)
-    est = ESTIMATORS[estimator](init, cameras, track)
-    for k, v in (overrides or {}).items():            # tuning / ablation: estimator class parameters
-        if not hasattr(est, k):
-            raise SystemExit(f'{estimator} has no parameter {k}')
-        setattr(est, k, type(getattr(est, k))(v))
+    cls = ESTIMATORS[estimator]
+    if overrides:                                     # tuning / ablation: estimator class parameters, applied to a
+        for k in overrides:                           # subclass BEFORE construction (the EKF is built in __init__)
+            if not hasattr(cls, k):
+                raise SystemExit(f'{estimator} has no parameter {k}')
+        cls = type(cls.__name__, (cls,), {k: type(getattr(cls, k))(v) for k, v in overrides.items()})
+    est = cls(init, cameras, track)
     rows, proc = [], []
     rp = Replay(mcap, cams=cams, state=state, start_s=start_s, duration_s=duration_s)
     n_state = 0
