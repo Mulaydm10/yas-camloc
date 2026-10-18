@@ -124,6 +124,22 @@ built from the unchanged night images. Columns give the `fr` map-localisation su
 
 When a fix succeeds it stays accurate: median 0.4–0.5 m in every case.
 
+Spatial changes, which CLAHE cannot undo (TASK G, CLAHE map, success rate per camera fl / fr / r):
+
+| query images | fl | fr | r |
+|---|---|---|---|
+| unchanged | 33 % | 82 % | 52 % |
+| saturated sky (top 25 % white) | 33 % | 76 % | 44 % |
+| cast shadow band | 20 % | 64 % | 36 % |
+| floodlight glare (3 blobs) | 15 % | 34 % | 20 % |
+| extra blur for 30 m/s | 11 % | 37 % | 13 % |
+| extra blur for 45 m/s | 0 % | 7 % | 1 % |
+| extra blur for 60 m/s | 0 % | 0.5 % | 0 % |
+
+- The blur is added on top of the blur already in the night images, so it is pessimistic.
+- Even so, **much higher speed than training is the largest open risk**: map matching then mostly fails, and
+  accuracy falls to the blackout regime above (2–5 m).
+
 **Losing map fixes.** These are switches for testing only (`--set FIX_DROP=…` / `FIX_GAP_S=… FIX_PERIOD_S=…`):
 
 | map fixes | lap 4 | whole run |

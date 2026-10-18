@@ -96,6 +96,9 @@ def main(path, t0, t1, prior=10.0, step=3, aug='none'):
         m = a[:, 0] == i
         ok = m & ~np.isnan(a[:, 1])
         pos = np.hypot(a[ok, 1], a[ok, 2])
+        if not ok.any():
+            print(f'{c}: success 0/{m.sum()}')
+            continue
         print(f'{c}: success {ok.sum()}/{m.sum()} | pos err median {np.median(pos):.2f} p90 {np.percentile(pos, 90):.2f} m | '
               f'lon median|.| {np.median(np.abs(a[ok, 1])):.2f} lat {np.median(np.abs(a[ok, 2])):.2f} m | '
               f'yaw median|.| {np.median(np.abs(a[ok, 3])):.2f} deg | <2 m {np.mean(pos < 2) * 100:.0f}% | inliers {np.median(a[ok, 4]):.0f}')
