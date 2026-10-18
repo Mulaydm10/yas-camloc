@@ -18,7 +18,9 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 - It then writes `out.csv` (`timestamp_ns,x,y,yaw`) and `out.run.json`, which holds the per-frame processing
   time and the hardware.
 - **No starting pose is needed (or read).** The localiser finds its own first pose by matching the cameras
-  against the whole visual map (global initialisation, consensus of two cameras or three frames), and
+  against the whole visual map (global initialisation: a provisional lock from two cameras agreeing in one frame
+  or three odometry-consistent frames, confirmed by the next map fixes or switched to a consistent alternative;
+  time-boxed search; a pose is emitted from 3 s at the latest), and
   re-localises the same way after more than 15 s without a map fix. `/tf` `map->base_link` is never read at
   inference (`--gt-init` exists for validation only).
 - **Input layouts:** the training layout (`state_estimation`, `track_bounds`), or the organisers'
@@ -189,6 +191,12 @@ visual-heading-only result (21.5 m).
 - **Locked front wheels under hard braking.** The front wheels can lock while the car is still at 20 m/s. An
   odometry that trusted the front axle then ran away by 16 m in the lap 2 hairpin (EXP-0028). The axle is now
   chosen by driving phase: under braking the faster axle, otherwise the front axle, times cos(steer).
+- **No starting pose: the organisers' sample has no GT.** On the daylight sample (crash test only, never used for
+  tuning) the localiser locks at 0.6 s, keeps 74/74 one-second bins and stays on the track, but its accuracy
+  there is unknown. Daylight against a night map gives sparse fixes (11 accepted / 23 rejected over 74 s), so
+  between fixes the pose is dead reckoning, which gave 2.7 m RMSE over a 30 s fix blackout and 5 m over 60 s on lap 4 (EXP-0035).
+  On training, an aliased start (a look-alike place 10–14 m along the track) can lock off and takes 0.3–10 s to
+  correct (EXP-0038/0039).
 - **No lateral measurement from paint or kerbs:** with cameras about 0.2 m above the border paint it is
   geometrically unobservable (EXP-0006). A real daylight recording has not been tested; the augmentations above
 are only a proxy for it.
