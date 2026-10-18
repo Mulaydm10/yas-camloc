@@ -5,7 +5,8 @@ GT pose perturbed by a given error (to mimic the filter's prior).
 
 --aug alters the QUERY images only (the map stays as built) to probe robustness to lighting / speed changes:
 gamma0.5 (brighter), gamma2 (darker), contrast0.5, blur9 (9 px horizontal motion blur, half resolution),
-noise10 (Gaussian, sigma 10 grey levels), day (gamma 0.4 + contrast 0.6: washed-out bright image).
+noise10 (Gaussian, sigma 10 grey levels), day (gamma 0.4 + contrast 0.6: washed-out bright image);
+spatial (TASK G): flood (glare blobs), shadow (dark band), sky (top clipped white), speedV (blur for V m/s).
 """
 import json
 import sys
@@ -36,6 +37,25 @@ def augment(g, aug):
         f = f + np.random.default_rng(int(f.sum()) % 2**32).normal(0, float(aug[5:]), f.shape)
     elif aug == 'day':
         f = 128 + 0.6 * (255 * (f / 255) ** 0.4 - 128)
+    # spatial augmentations (Devin TASK G): local effects that a global CLAHE cannot undo
+    elif aug == 'flood':          # floodlight glare: three bright Gaussian blobs, positions fixed per image size
+        h, w = f.shape
+        yy, xx = np.mgrid[0:h, 0:w]
+        rng = np.random.default_rng(h * 7 + w)
+        for _ in range(3):
+            cy, cx, r = rng.uniform(0.1, 0.6) * h, rng.uniform(0.1, 0.9) * w, rng.uniform(0.06, 0.12) * w
+            f = f + 220 * np.exp(-((yy - cy) ** 2 + (xx - cx) ** 2) / (2 * r * r))
+    elif aug == 'shadow':         # cast shadow: a dark diagonal band over the lower half (55 % darker)
+        h, w = f.shape
+        yy, xx = np.mgrid[0:h, 0:w]
+        band = (yy > 0.45 * h) & ((xx + 0.8 * yy) % (0.9 * w) < 0.45 * w)
+        f = np.where(band, 0.45 * f, f)
+    elif aug == 'sky':            # saturated sky / sun: the top 25 % clipped to white
+        h = f.shape[0]
+        f[: h // 4] = 255
+    elif aug.startswith('speed'):  # motion blur scaled to speed: speedV = blur for V m/s (half-res px ~ V / 3)
+        k = max(3, int(round(float(aug[5:]) / 3)))
+        f = cv2.filter2D(f, -1, np.ones((1, k), np.float32) / k)
     elif aug != 'none':
         raise SystemExit(f'unknown --aug {aug}')
     return np.clip(f, 0, 255).astype(np.uint8)
