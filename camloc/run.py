@@ -282,7 +282,7 @@ class VisualMapLoc(VisualHeading):
         self.n_cons_reject = 0
         self.t0_stress = None
         self.need_init = False            # TASK I: set by run() when the run gives no starting pose
-        self._gi_hist, self._gi_out, self._nframe = [], None, 0
+        self._gi_hist, self._gi_out, self._nframe, self._gi_best, self._lock_kind = [], None, 0, None, ''
         self.stats.update({'global_init_locks': 0, 'global_init_lock_t_s': None, 'reinit_locks': 0})
 
     @property
@@ -293,7 +293,11 @@ class VisualMapLoc(VisualHeading):
     # A pose is locked only on consensus: two cameras within GI_AGREE_M / GI_AGREE_DEG in one frame, or the best
     # hypothesis of GI_FRAMES consecutive frames agreeing after odometry propagation; it must lie on a lane.
     GI_AGREE_M, GI_AGREE_DEG, GI_FRAMES, GI_LANE_MARGIN = 2.0, 5.0, 3, 2.0
-    GI_EMIT_HYP = 0                      # 1 = emit the best single hypothesis before the lock
+    GI_EMIT_HYP = 0                      # 1 = emit the best hypothesis before the lock from the first frame
+    # pre-lock time box (s from the first frame): full 3-camera search until GI_FULL_S, then one camera per frame;
+    # relaxed (temporal-only) lock from GI_SOFT_S; lock to the best-supported hypothesis at GI_HARD_S; emit the best
+    # hypothesis from GI_EMIT_AFTER_S. Night training starts lock strictly within 4.5 s (EXP-0036).
+    GI_FULL_S, GI_SOFT_S, GI_HARD_S, GI_EMIT_AFTER_S = 3.0, 6.0, 10.0, 3.0
     REINIT_S, REINIT_EVERY = 15.0, 10     # no accepted fix for this long -> global search every N frames (0 = off)
 
     def _global_hyps(self, gray, cams=None):
@@ -306,7 +310,7 @@ class VisualMapLoc(VisualHeading):
                 hyps.append(r)
         return hyps
 
-    def _try_lock(self, hyps, t):
+    def _try_lock(self, hyps, t, relaxed=False):
         """Consensus lock from this frame's hypotheses and the recent history (propagated by odometry)."""
         ex, ey, eh = self.ekf.X[:3]                   # odometry-propagated frame of reference
         agree = lambda a, b: (np.hypot(a[0] - b[0], a[1] - b[1]) < self.GI_AGREE_M
@@ -329,7 +333,7 @@ class VisualMapLoc(VisualHeading):
         self._gi_hist = self._gi_hist[-self.GI_FRAMES:]
         if cand is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
             return None
-        if not any(h[3] for h in self._gi_hist):
+        if not relaxed and not any(h[3] for h in self._gi_hist):
             return None
         now = cand
         best = cand
@@ -342,17 +346,26 @@ class VisualMapLoc(VisualHeading):
                 return None
         return now
 
-    def _lock(self, pose, t, reinit):
+    def _propagate_best(self):
+        h, (px, py, ph) = self._gi_best
+        ex, ey, eh = self.ekf.X[:3]
+        c, s_ = np.cos(-ph), np.sin(-ph)
+        dx, dy = c * (ex - px) - s_ * (ey - py), s_ * (ex - px) + c * (ey - py)
+        return (h['x'] + np.cos(h['yaw']) * dx - np.sin(h['yaw']) * dy, h['y'] + np.sin(h['yaw']) * dx + np.cos(h['yaw']) * dy,
+                float(np.angle(np.exp(1j * (h['yaw'] + eh - ph)))))
+
+    def _lock(self, pose, t, reinit, sigma=(3.0, 2.0)):
         x, y, yaw = pose
-        self.ekf = self._make_ekf(x, y, yaw, p0=(3.0, 3.0, np.radians(2.0)))   # honest: a lock can be metres off
+        self.ekf = self._make_ekf(x, y, yaw, p0=(sigma[0], sigma[0], np.radians(sigma[1])))   # honest: a lock can be off
         self.lane = str(self.track.locate(x, y, yaw)[0][0])
         self.kf_t, self.last_fix_t, self.n_reject, self.n_cons_reject = None, t, 0, 0
-        self._trk, self._gi_hist, self.need_init = {}, [], False
+        self._trk, self._gi_hist, self.need_init, self._gi_best = {}, [], False, None
         if reinit:
             self.stats['reinit_locks'] += 1
         else:
             self.stats['global_init_locks'] += 1
             self.stats['global_init_lock_t_s'] = round((t - self._t_first) / 1e9, 2)
+            self.stats['global_init_lock_kind'] = self._lock_kind
 
     def on_frames(self, fs):
         self._nframe += 1
@@ -360,16 +373,28 @@ class VisualMapLoc(VisualHeading):
             if not hasattr(self, '_t_first'):
                 self._t_first = fs.stamp_ns
             self._advance(fs.stamp_ns)
-            hyps = self._global_hyps(self._gray(fs))
-            lock = self._try_lock(hyps, fs.stamp_ns)
+            el = (fs.stamp_ns - self._t_first) / 1e9
+            gray = self._gray(fs)
+            if el < self.GI_FULL_S:                   # time-boxed: all cameras first, then one camera per frame
+                hyps = self._global_hyps(gray)
+            else:
+                self._rr = (getattr(self, '_rr', -1) + 1) % len(self.MAP_CAMS)
+                hyps = self._global_hyps(gray, [self.MAP_CAMS[self._rr]])
+            for h in hyps:                            # best-supported hypothesis so far, propagated by odometry
+                if self._gi_best is None or h['n'] > self._gi_best[0]['n']:
+                    self._gi_best = (h, tuple(self.ekf.X[:3]))
+            lock = self._try_lock(hyps, fs.stamp_ns, relaxed=el >= self.GI_SOFT_S)
+            self._lock_kind = 'strict' if el < self.GI_SOFT_S else 'soft'
+            sigma = (3.0, 2.0) if el < self.GI_SOFT_S else (5.0, 5.0)
+            if lock is None and el >= self.GI_HARD_S and self._gi_best is not None:
+                lock, self._lock_kind, sigma = self._propagate_best(), 'best', (10.0, 10.0)
             if lock is not None:
-                self._lock(lock, fs.stamp_ns, reinit=False)
+                self._lock(lock, fs.stamp_ns, reinit=False, sigma=sigma)
                 return self.ekf.pose
-            # before the lock: emit NO pose. A wrong guess costs far more RMSE than a missing frame (coverage counts
-            # 1-s bins, and the lock usually comes within 0.1 s); the GI_EMIT_HYP option emits the best hypothesis
-            if self.GI_EMIT_HYP and hyps:
-                b = max(hyps, key=lambda h: h['n'])
-                return (b['x'], b['y'], b['yaw'])
+            # before the lock: no pose for the first GI_EMIT_AFTER_S (a wrong guess costs more RMSE than a missing
+            # frame), then the best-supported hypothesis so coverage of the 1-s bins holds
+            if (self.GI_EMIT_HYP or el >= self.GI_EMIT_AFTER_S) and self._gi_best is not None:
+                return self._propagate_best()
             return None
         gray = self._gray(fs)
         cams = [c for c in self.MAP_CAMS if c in gray]
