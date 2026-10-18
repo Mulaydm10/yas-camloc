@@ -1,7 +1,7 @@
 # STATE.md - live snapshot (OVERWRITE every session)
 
 If STATE and `worklog.md` disagree about what is true *now*, STATE wins; the worklog explains how we got here.
-Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Owner to-do: make the repo PUBLIC, submit the form.
+Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Repo is PUBLIC. Owner to-do: submit the form.
 
 ## Done
 - Dataset analysis (`REPORT.md` §0-9), D1 package, D2 odometry + EKF, D3 camera geometry (pivot, §10), D4 visual heading.
@@ -13,7 +13,7 @@ Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Owner to-do: make the re
 - Devin review loop (issues #1, #2; protocol TASK -> ACK -> DONE): tasks A-H done. H: real speed blur is small (front exposure ~0.5-1 ms, EXP-0030/0031); no fallback change beat the default (EXP-0032). Open risk: anything that removes map fixes (glare) -> 2-5 m dead reckoning.
 - Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
 - TASK M/N: slides.pdf (6), demo.mp4 (4:39), demo_script.md; pose CSV `timestamp_ns,x,y,yaw,confidence,status` (scores identical); submissions/poses, validation (+ pooled), trajectory_lap4.png/.mp4; README "Submission" section. Team Rogue Ravens.
-- Submission README with results and plots (`docs/`); 27 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
+- Submission README with results and plots (`docs/`); 27 tests green; pushed to github.com/Mulaydm10/yas-camloc (PUBLIC since 2026-10-18, 21:30 CEST).
 
 ## In flight
 - (none) - submission frozen at f314e61 (estimator); run.sh with no flags works on both layouts (submissions/README.md)
@@ -22,10 +22,10 @@ Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Owner to-do: make the re
 - `COMPETITION.md` filled from the brief (2026-10-18); still unknown: deadline, dates, team size, roster, upload channel (Q-0002). Thesis `VISION.md` (Q-0001).
 - `tests/README.md` (LOCKED) still says there is no test baseline: needs a Main Agent edit + audit row.
 - Organiser questions: state_estimation fields (REPORT.md §9 Q1, default allowed-only), authoritative (s, n) reference, missing 35 s bag, test-file contents (REPORT.md §11 Q11-13).
-- A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
+- Repo is public; Drive links for the videos are in the README Submission section (TASK O). Owner: submit the form.
 
 ## Next intended step
-1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): make the repo PUBLIC; submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
+1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
 2. Deliverables done: submissions/slides.pdf, demo.mp4, demo_script.md (TASK M). FROZEN: estimator f314e61, verified by Devin on the sample (strict lock 0.6 s, 74/74 bins). No more estimator changes; docs only.
 
 ## Latest experiment
