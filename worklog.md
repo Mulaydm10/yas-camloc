@@ -95,3 +95,7 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - Global initialisation over the whole map, locked on multi-frame consensus; no pose before the lock; re-localisation after 15 s without fixes (time-boxed: one camera per attempt). First lock rule gave 2/16 wrong locks; stricter rule gives 0/16. Strict laps 2/4/6 identical to GT init.
 - I.0: topic resolution by suffix, bounds asset fallback (exported by run.sh), validation/twist as the state input when state_estimation is absent; run.sh falls back to Python >= 3.10 with requirements-compat.txt (tested on 3.10).
 - Devin crash-tested the organisers' sample: right format, 74/74 1-s bins, 84 ms/frame after time-boxing.
+
+## 2026-10-18 18:15 CEST - Claude (Opus) - TASK J and K: provisional lock, evidence-based switch (EXP-0037, EXP-0038)
+- J (016ba24): two cameras agreeing in one frame give a provisional lock (sigma 3 m), confirmed by 2 accepted fixes; soft fallback at 6 s, best-hypothesis fallback at 10 s. The aliased lap 6 @ 70 % start recovers (1.42 m).
+- K: Devin's sample re-run showed a wrong daylight revoke, with the region exclusion delaying recovery by about 25 s and a p95 of 1020 ms. Now a revoke needs >= 3 mutually consistent rejected fixes >= 5 m away, and it switches to that pose. There is no exclusion and no new search. Strict 0.513 / 0.303 / 95.1 % unchanged; lap 6 @ 70 % switches after 0.3 s (1.04 m); the other 15 starts are identical. 26 tests.

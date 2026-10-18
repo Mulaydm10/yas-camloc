@@ -8,10 +8,11 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - D5 done: geo-referenced ORB map (CLAHE) + quality-weighted PnP fixes, EKF with online sideslip states, braking-aware (phase) wheel odometry (`--estimator vismap`, `./run.sh`).
   **Strict** held-out validation (map AND odometry calibration rebuilt without the scored lap): lap 2 0.598 m, lap 4 0.460 m, lap 6 0.415 m, **pooled 0.513 m, lateral 0.303 m, 95.1 % within 1 m** (EXP-0026..0028).
 - TASK I (deadline-critical): no starting pose in the test file -> global initialisation + re-localisation (EXP-0036); test-domain layout without state_estimation / tf / track_bounds (validation/twist, bounds asset); run.sh Python >= 3.10 fallback. Strict auto-init 0.513 / 0.303 / 95.1 %, 0 wrong locks in 16 mid-lap starts. Devin crash test on the organisers' sample: 84 ms/frame, 74/74 1-s bins.
+- TASK J/K (EXP-0037/0038): provisional two-camera lock (sigma 3 m), confirmed by 2 accepted fixes; revoked only when >= 3 rejected fixes agree on a pose >= 5 m away, then switched to it (no exclusion, no new search). Strict unchanged; all 16 mid-lap starts end correct.
 - Freeze pass (Devin TASK C): clean clone of `f49ab7f` -> byte-identical map, 100 % coverage, 20.3 ms/frame mean (M4 CPU) (`submissions/README.md`).
 - Devin review loop (issues #1, #2; protocol TASK -> ACK -> DONE): tasks A-H done. H: real speed blur is small (front exposure ~0.5-1 ms, EXP-0030/0031); no fallback change beat the default (EXP-0032). Open risk: anything that removes map fixes (glare) -> 2-5 m dead reckoning.
 - Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
-- Submission README with results and plots (`docs/`); 19 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
+- Submission README with results and plots (`docs/`); 26 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
 
 ## In flight
 - (none)
@@ -24,10 +25,10 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 
 ## Next intended step
 1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): make the repo PUBLIC; submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
-2. Devin: final crash test of the latest main on the organisers' sample.
+2. Devin: re-run the organisers' sample on the TASK K commit (guard: if not validated by 18:30 UTC, ship with the revoke disabled, PROV_REVOKE=0).
 
 ## Latest experiment
-EXP-0036: global initialisation, strict auto-init 0.513 / 0.303 / 95.1 %, 0 wrong locks in 16 starts.
+EXP-0038: evidence-based revoke and switch; strict 0.513 / 0.303 / 95.1 %; 16/16 starts end correct.
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |

@@ -352,16 +352,49 @@ class VisualMapLoc(VisualHeading):
                 return None
         return now
 
-    # provisional-lock bookkeeping (TASK J): confirm after PROV_CONFIRM accepted fixes; revoke when >= PROV_REVOKE
-    # frames with fixes rejected and rejections > 3x acceptances, or the window ends with >= 3 rejected, < 2 accepted
-    PROV_CONFIRM, PROV_REVOKE, PROV_WINDOW_S, EXCL_M, EXCL_S = 2, 6, 8.0, 20.0, 15.0
+    # provisional-lock bookkeeping (TASK J, K): confirm after PROV_CONFIRM accepted fixes. Revoke ONLY on positive
+    # evidence for an alternative (TASK K): >= PROV_ALT_N frames of rejected fixes that agree with each other
+    # (GI_AGREE_M / GI_AGREE_DEG after odometry propagation) on a pose >= PROV_ALT_FAR_M from the current one; the
+    # filter then switches to that pose (a new provisional lock). Scattered or few rejections (daylight noise) never
+    # revoke, and there is no region exclusion or new global search. PROV_REVOKE=0 disables revoking.
+    PROV_CONFIRM, PROV_REVOKE, PROV_WINDOW_S, PROV_ALT_N, PROV_ALT_FAR_M = 2, 1, 8.0, 3, 5.0
+    EXCL_M = 20.0                         # only used by the region exclusion, which TASK K no longer sets
 
-    def _revoke(self, t):
-        """Wrong lock: search again, excluding the region around the (odometry-propagated) revoked pose."""
+    def _propagate(self, pose, ref):
+        """Carry a pose observed when the filter was at `ref` forward by the filter's motion since then."""
+        (hx, hy, hh), (px, py, ph) = pose, ref
+        ex, ey, eh = self.ekf.X[:3]
+        c, s_ = np.cos(-ph), np.sin(-ph)
+        dx, dy = c * (ex - px) - s_ * (ey - py), s_ * (ex - px) + c * (ey - py)
+        return (hx + np.cos(hh) * dx - np.sin(hh) * dy, hy + np.sin(hh) * dx + np.cos(hh) * dy,
+                float(np.angle(np.exp(1j * (hh + eh - ph)))))
+
+    def _alternative(self):
+        """A pose supported by >= PROV_ALT_N mutually consistent rejected fixes, far from the current pose, or None."""
+        alt = self._prov['alt']
+        if len(alt) < self.PROV_ALT_N:
+            return None
+        P = [self._propagate(p, ref) for p, ref in alt]
+        x, y = self.ekf.X[:2]
+        best = None
+        for a in P:
+            grp = [b for b in P if np.hypot(a[0] - b[0], a[1] - b[1]) < self.GI_AGREE_M
+                   and abs(np.angle(np.exp(1j * (a[2] - b[2])))) < np.radians(self.GI_AGREE_DEG)]
+            if len(grp) >= self.PROV_ALT_N and (best is None or len(grp) > len(best)):
+                best = grp
+        if best is None:
+            return None
+        m = (float(np.mean([b[0] for b in best])), float(np.mean([b[1] for b in best])),
+             float(np.angle(np.mean(np.exp(1j * np.array([b[2] for b in best]))))))
+        return m if np.hypot(m[0] - x, m[1] - y) >= self.PROV_ALT_FAR_M else None
+
+    def _revoke(self, t, alt):
+        """Wrong lock with a consistent alternative: switch to it (again provisional, same honest sigma)."""
         self.stats['lock_revokes'] += 1
-        self._prov, self.need_init, self._revoked = None, True, True
-        self._excl_until = t + int(self.EXCL_S * 1e9)
-        self._t_first, self._gi_hist, self._gi_best = t, [], None
+        keep = {k: self.stats.get(k) for k in ('global_init_locks', 'global_init_lock_t_s', 'global_init_lock_kind', 'reinit_locks')}
+        self._lock(alt, t, reinit=False)
+        self.stats.update(keep)
+        self.stats['lock_switch_t_s'] = round((t - getattr(self, '_t_first', t)) / 1e9, 2)
 
     def _propagate_best(self):
         h, (px, py, ph) = self._gi_best
@@ -377,7 +410,7 @@ class VisualMapLoc(VisualHeading):
         self.lane = str(self.track.locate(x, y, yaw)[0][0])
         self.kf_t, self.last_fix_t, self.n_reject, self.n_cons_reject = None, t, 0, 0
         self._trk, self._gi_hist, self.need_init, self._gi_best = {}, [], False, None
-        self._prov = {'t': t, 'acc': 0, 'rej': 0}      # every lock is provisional until fixes confirm it
+        self._prov = {'t': t, 'acc': 0, 'rej': 0, 'alt': []}   # every lock is provisional until fixes confirm it
         if reinit:
             self.stats['reinit_locks'] += 1
         else:
@@ -496,15 +529,20 @@ class VisualMapLoc(VisualHeading):
         if self._prov is not None:                    # TASK J: confirm or revoke a provisional lock
             self._prov['acc'] += int(accepted)
             self._prov['rej'] += int(bool(fixes) and not accepted)
+            rej = [f for f in fixes if not any(f is u for u in use)]
+            if rej and not accepted:                  # one candidate per frame: the best-supported rejected fix
+                b = max(rej, key=lambda f: f['n'])
+                self._prov['alt'].append(((b['x'], b['y'], b['yaw']), (x, y, yaw)))
             el = (fs.stamp_ns - self._prov['t']) / 1e9
-            a_, r_ = self._prov['acc'], self._prov['rej']
+            a_ = self._prov['acc']
+            alt = self._alternative() if self.PROV_REVOKE and a_ < self.PROV_CONFIRM else None
             if a_ >= self.PROV_CONFIRM:
                 self._prov = None
                 self.stats['lock_confirms'] += 1
-            elif (r_ >= self.PROV_REVOKE and r_ > 3 * a_) or (el > self.PROV_WINDOW_S and r_ >= 3 and a_ < self.PROV_CONFIRM):
-                self._revoke(fs.stamp_ns)
+            elif alt is not None:
+                self._revoke(fs.stamp_ns, alt)
                 return self.ekf.pose
-            elif el > self.PROV_WINDOW_S:             # no evidence either way (fix drought): keep it
+            elif el > self.PROV_WINDOW_S:             # no consistent alternative within the window: keep it
                 self._prov = None
                 self.stats['lock_confirms'] += 1
         if self.FIX_LOG:

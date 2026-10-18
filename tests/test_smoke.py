@@ -351,3 +351,19 @@ def test_twist_odometry_uses_velocity_and_sideslip():
     o = Odometry(params={'q': {}}, source='wheels')
     o.update(0, {'twist_vx': 30.0, 'twist_vy': 0.5, 'twist_wz': 0.1})
     assert abs(o.v - np.hypot(30, 0.5)) < 1e-9 and o.wz == 0.1 and abs(o.beta_meas - np.arctan2(0.5, 30)) < 1e-12
+
+
+def test_revoke_needs_consistent_alternative():
+    """TASK K: scattered rejected fixes never revoke a provisional lock; >= 3 agreeing ones far away switch to them."""
+    from types import SimpleNamespace
+    from camloc.run import VisualMapLoc
+    m = object.__new__(VisualMapLoc)
+    m.ekf = SimpleNamespace(X=np.array([0.0, 0.0, 0.0, 0.0]))
+    ref = (0.0, 0.0, 0.0)
+    m._prov = {'alt': [((20.0 * k, 5.0 * k, 0.0), ref) for k in range(1, 6)]}     # scattered
+    assert m._alternative() is None
+    m._prov = {'alt': [((12.0 + 0.3 * k, 0.1, 0.01), ref) for k in range(3)]}     # consistent, 12 m away
+    alt = m._alternative()
+    assert alt is not None and abs(alt[0] - 12.3) < 1e-6
+    m._prov = {'alt': [((1.0 + 0.3 * k, 0.1, 0.01), ref) for k in range(3)]}      # consistent but close: noise
+    assert m._alternative() is None
