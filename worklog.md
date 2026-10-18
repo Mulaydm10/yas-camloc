@@ -73,3 +73,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - E: camera ~0.2-0.4 m higher above the paint than the map datum, but paint lateral scatter 0.44-0.74 m: closed.
 - F: phase-based axle choice; root cause of the strict lap 2 blow-up was locked front wheels under 42 bar braking with a front-axle fit. Strict pooled 0.513 m / 0.303 m / 95.1 %.
 - C: freeze pass from a clean clone (byte-identical map, 100 % coverage, 20.3 ms/frame). G: glare halves map success; extra blur for 45+ m/s nearly defeats ORB matching (open risk, mitigation proposed to Devin).
+
+## 2026-10-18 08:25 CEST - Claude (Opus, screen session) - Devin TASK H (EXP-0030..0032)
+- H.1: blur_vs_speed + exposure_fit: no measurable blur growth with speed; physical flow-field blur fits front exposure ~0.5-1 ms; EXP-0029 speed rows relabelled as an unphysical worst case.
+- H.3: map-point tracking and lower FAST threshold explored; cannot seed under synthetic heavy blur; parked (default off).
+- H.2: gated reset, corner lateral bounds, online wheel-scale state, DCS soft gate; plus wrong-fix injection test. None adopted (no clear win on normal + stress); default passes wrong-fix injection. Phase odometry has ~0 signed speed bias.
+- Session restart mid-way (runs survived); orphan watcher cleaned; EXP timestamps corrected.
