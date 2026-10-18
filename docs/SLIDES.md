@@ -18,10 +18,10 @@ lap, processing is causal, and only the allowed car signals are used.
 - (Diagram: README "Method".)
 
 ## 3. Results (60 s)
-- Held-out laps 2 / 4 / 6: **0.675 / 0.528 / 0.487 m** position RMSE. Pooled **0.586 m**, lateral 0.421 m,
-  heading 0.25°, **91 % within 1 m**.
+- Strict held-out laps 2 / 4 / 6 (map and calibration without the lap): **0.598 / 0.460 / 0.415 m**. Pooled
+  **0.513 m**, lateral **0.303 m**, heading 0.31°, **95 % within 1 m**.
 - Progression: 528 m (hold) → 144 (odometry) → 55 (map priors) → 21.5 (visual heading) → about 1 m (map
-  fixes) → 0.59 m (gating, CLAHE, quality weighting, sideslip).
+  fixes) → 0.51 m (gating, CLAHE, quality weighting, online sideslip, braking-aware odometry).
 - Plot: `docs/traj_lap4_heldout.png` (trajectory on the track map, coloured by error, plus error vs time).
 
 ## 4. Runtime (30 s)
@@ -35,7 +35,7 @@ lap, processing is causal, and only the allowed car signals are used.
 - Map-fix loss: 30 s / 60 s blackouts give 2.3 / 2.9 m and recover. Total map failure falls back to 21.5 m.
 - Failure cases:
   - the feature-poor back straight at night;
-  - sideslip biases the lateral position outward in long left corners; modelled at half gain, but lap 2 does not benefit;
+  - locked front wheels under hard braking made the odometry run away by 16 m (fixed by phase-based axle choice);
   - lateral position from paint is unobservable (camera height above the paint about 0.2 m).
 
 ## 6. Lessons learned (45 s)

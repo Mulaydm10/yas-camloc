@@ -1,41 +1,42 @@
-# Validation lap 6 (map built WITHOUT lap 6), estimator vismap (defaults of EXP-0025), allowed signals only, causal
+# Validation lap 6, STRICT hold-out: visual map AND odometry/sideslip calibration built WITHOUT lap 6
+# estimator vismap (defaults of EXP-0026/0028), allowed signals only, causal
 # x/y scoring: organiser tools/evaluate.py on the lap window (camloc.evaluate --official)
 coverage 99.1 % (ranked), evaluated 1150 / 1150 poses
 
 | group | n | pos RMSE | lat RMSE | lon RMSE | yaw RMSE ° | p95 | ≤1 m % |
 |---|---|---|---|---|---|---|---|
-| **all** (official) | 1150 | 0.487 | 0.330 | 0.358 | 0.20 | 0.99 | 95.1 |
-| GT good (acc ≤ 1 m) | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
-| GT blip | 37 | 0.459 | 0.223 | 0.401 | 0.18 | 0.74 | 94.6 |
-| lane track | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
+| **all** (official) | 1150 | 0.415 | 0.206 | 0.361 | 0.19 | 0.86 | 96.6 |
+| GT good (acc ≤ 1 m) | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
+| GT blip | 37 | 0.409 | 0.115 | 0.393 | 0.18 | 0.76 | 94.6 |
+| lane track | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
 | lane pit | 0 | | | | | | |
-| sector S1 | 96 | 0.431 | 0.235 | 0.362 | 0.18 | 0.68 | 96.9 |
-| sector S2 | 128 | 0.404 | 0.059 | 0.400 | 0.16 | 0.79 | 97.7 |
-| sector S3 | 119 | 0.334 | 0.211 | 0.259 | 0.25 | 0.54 | 100.0 |
-| sector S4 | 82 | 0.373 | 0.044 | 0.371 | 0.09 | 0.68 | 100.0 |
-| sector S5 | 104 | 0.345 | 0.045 | 0.342 | 0.16 | 0.78 | 100.0 |
-| sector S6 | 179 | 0.353 | 0.099 | 0.339 | 0.14 | 0.64 | 98.3 |
-| sector S7 | 144 | 0.952 | 0.837 | 0.454 | 0.35 | 1.72 | 71.5 |
-| sector S8 | 75 | 0.353 | 0.171 | 0.308 | 0.14 | 0.61 | 98.7 |
-| sector S9 | 104 | 0.341 | 0.131 | 0.315 | 0.14 | 0.66 | 100.0 |
-| sector S10 | 82 | 0.429 | 0.262 | 0.340 | 0.17 | 0.72 | 96.3 |
-| speed 0-10 m/s | 50 | 0.261 | 0.047 | 0.257 | 0.18 | 0.50 | 100.0 |
-| speed 10-20 m/s | 230 | 0.738 | 0.613 | 0.411 | 0.29 | 1.65 | 82.2 |
-| speed 20-30 m/s | 410 | 0.444 | 0.252 | 0.365 | 0.19 | 0.84 | 98.5 |
-| speed 30-50 m/s | 423 | 0.364 | 0.163 | 0.326 | 0.15 | 0.68 | 98.3 |
-| lap 6 | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
+| sector S1 | 96 | 0.412 | 0.197 | 0.361 | 0.16 | 0.68 | 96.9 |
+| sector S2 | 128 | 0.416 | 0.085 | 0.407 | 0.16 | 0.81 | 96.9 |
+| sector S3 | 119 | 0.303 | 0.142 | 0.267 | 0.26 | 0.60 | 100.0 |
+| sector S4 | 82 | 0.376 | 0.079 | 0.368 | 0.10 | 0.69 | 100.0 |
+| sector S5 | 104 | 0.353 | 0.059 | 0.348 | 0.16 | 0.85 | 100.0 |
+| sector S6 | 179 | 0.330 | 0.090 | 0.318 | 0.14 | 0.64 | 98.3 |
+| sector S7 | 144 | 0.677 | 0.481 | 0.477 | 0.33 | 1.21 | 83.3 |
+| sector S8 | 75 | 0.320 | 0.099 | 0.305 | 0.14 | 0.53 | 98.7 |
+| sector S9 | 104 | 0.347 | 0.156 | 0.310 | 0.14 | 0.66 | 100.0 |
+| sector S10 | 82 | 0.390 | 0.172 | 0.350 | 0.17 | 0.74 | 97.6 |
+| speed 0-10 m/s | 50 | 0.221 | 0.061 | 0.213 | 0.18 | 0.38 | 100.0 |
+| speed 10-20 m/s | 230 | 0.538 | 0.338 | 0.419 | 0.28 | 1.16 | 90.4 |
+| speed 20-30 m/s | 410 | 0.415 | 0.186 | 0.371 | 0.18 | 0.85 | 97.8 |
+| speed 30-50 m/s | 423 | 0.352 | 0.135 | 0.325 | 0.14 | 0.65 | 98.6 |
+| lap 6 | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
 
 --- tools/evaluate.py on the same window ---
 poses submitted        1150   evaluated 1150
 coverage (1 s bins)    99.1 %   (>= 90 % to be ranked)
-position RMSE  [m]     0.487   <- SCORE (lower is better)
-position median/p95    0.310 / 0.986
-lateral RMSE   [m]     0.330
-longitudinal RMSE [m]  0.358
-yaw RMSE     [deg]     0.200
-within 0.25 m          41.6 %
-within 0.50 m          78.3 %
-within 1.00 m          95.1 %
+position RMSE  [m]     0.415   <- SCORE (lower is better)
+position median/p95    0.261 / 0.856
+lateral RMSE   [m]     0.206
+longitudinal RMSE [m]  0.361
+yaw RMSE     [deg]     0.195
+within 0.25 m          48.1 %
+within 0.50 m          83.7 %
+within 1.00 m          96.6 %
 
 
 # (s, n) scoring: organiser map.mcap + tools from the 23-00-38 update (camloc.evaluate --sn)
@@ -43,46 +44,46 @@ coverage 99.1 % (ranked), evaluated 1150 / 1150 poses
 
 | group | n | pos RMSE | lat RMSE | lon RMSE | yaw RMSE ° | p95 | ≤1 m % |
 |---|---|---|---|---|---|---|---|
-| **all** (official) | 1150 | 0.487 | 0.330 | 0.358 | 0.20 | 0.99 | 95.1 |
-| GT good (acc ≤ 1 m) | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
-| GT blip | 37 | 0.459 | 0.223 | 0.401 | 0.18 | 0.74 | 94.6 |
-| lane track | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
+| **all** (official) | 1150 | 0.415 | 0.206 | 0.361 | 0.19 | 0.86 | 96.6 |
+| GT good (acc ≤ 1 m) | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
+| GT blip | 37 | 0.409 | 0.115 | 0.393 | 0.18 | 0.76 | 94.6 |
+| lane track | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
 | lane pit | 0 | | | | | | |
-| sector S1 | 96 | 0.431 | 0.235 | 0.362 | 0.18 | 0.68 | 96.9 |
-| sector S2 | 128 | 0.404 | 0.059 | 0.400 | 0.16 | 0.79 | 97.7 |
-| sector S3 | 119 | 0.334 | 0.211 | 0.259 | 0.25 | 0.54 | 100.0 |
-| sector S4 | 82 | 0.373 | 0.044 | 0.371 | 0.09 | 0.68 | 100.0 |
-| sector S5 | 104 | 0.345 | 0.045 | 0.342 | 0.16 | 0.78 | 100.0 |
-| sector S6 | 179 | 0.353 | 0.099 | 0.339 | 0.14 | 0.64 | 98.3 |
-| sector S7 | 144 | 0.952 | 0.837 | 0.454 | 0.35 | 1.72 | 71.5 |
-| sector S8 | 75 | 0.353 | 0.171 | 0.308 | 0.14 | 0.61 | 98.7 |
-| sector S9 | 104 | 0.341 | 0.131 | 0.315 | 0.14 | 0.66 | 100.0 |
-| sector S10 | 82 | 0.429 | 0.262 | 0.340 | 0.17 | 0.72 | 96.3 |
-| speed 0-10 m/s | 50 | 0.261 | 0.047 | 0.257 | 0.18 | 0.50 | 100.0 |
-| speed 10-20 m/s | 230 | 0.738 | 0.613 | 0.411 | 0.29 | 1.65 | 82.2 |
-| speed 20-30 m/s | 410 | 0.444 | 0.252 | 0.365 | 0.19 | 0.84 | 98.5 |
-| speed 30-50 m/s | 423 | 0.364 | 0.163 | 0.326 | 0.15 | 0.68 | 98.3 |
-| lap 6 | 1113 | 0.488 | 0.333 | 0.357 | 0.20 | 0.99 | 95.1 |
+| sector S1 | 96 | 0.412 | 0.197 | 0.361 | 0.16 | 0.68 | 96.9 |
+| sector S2 | 128 | 0.416 | 0.085 | 0.407 | 0.16 | 0.81 | 96.9 |
+| sector S3 | 119 | 0.303 | 0.142 | 0.267 | 0.26 | 0.60 | 100.0 |
+| sector S4 | 82 | 0.376 | 0.079 | 0.368 | 0.10 | 0.69 | 100.0 |
+| sector S5 | 104 | 0.353 | 0.059 | 0.348 | 0.16 | 0.85 | 100.0 |
+| sector S6 | 179 | 0.330 | 0.090 | 0.318 | 0.14 | 0.64 | 98.3 |
+| sector S7 | 144 | 0.677 | 0.481 | 0.477 | 0.33 | 1.21 | 83.3 |
+| sector S8 | 75 | 0.320 | 0.099 | 0.305 | 0.14 | 0.53 | 98.7 |
+| sector S9 | 104 | 0.347 | 0.156 | 0.310 | 0.14 | 0.66 | 100.0 |
+| sector S10 | 82 | 0.390 | 0.172 | 0.350 | 0.17 | 0.74 | 97.6 |
+| speed 0-10 m/s | 50 | 0.221 | 0.061 | 0.213 | 0.18 | 0.38 | 100.0 |
+| speed 10-20 m/s | 230 | 0.538 | 0.338 | 0.419 | 0.28 | 1.16 | 90.4 |
+| speed 20-30 m/s | 410 | 0.415 | 0.186 | 0.371 | 0.18 | 0.85 | 97.8 |
+| speed 30-50 m/s | 423 | 0.352 | 0.135 | 0.325 | 0.14 | 0.65 | 98.6 |
+| lap 6 | 1113 | 0.415 | 0.208 | 0.359 | 0.20 | 0.86 | 96.7 |
 
 --- organiser scorer, x/y + racing-line (s, n) ---
 poses submitted        1150   evaluated 1150
 coverage (1 s bins)    99.1 %   (>= 90 % to be ranked)
 --- map x/y ---
-position RMSE  [m]     0.487   <- SCORE (lower is better)
-position median/p95    0.310 / 0.986
-lateral RMSE   [m]     0.330   bias -0.116
-longitudinal RMSE [m]  0.358   bias +0.005
-yaw RMSE     [deg]     0.200
-within 0.25 m          41.6 %
-within 0.50 m          78.3 %
-within 1.00 m          95.1 %
+position RMSE  [m]     0.415   <- SCORE (lower is better)
+position median/p95    0.261 / 0.856
+lateral RMSE   [m]     0.206   bias -0.027
+longitudinal RMSE [m]  0.361   bias +0.004
+yaw RMSE     [deg]     0.195
+within 0.25 m          48.1 %
+within 0.50 m          83.7 %
+within 1.00 m          96.6 %
 --- racing line s/n (all poses) ---
-position RMSE  [m]     0.487   <- SCORE (lower is better)
-position median/p95    0.310 / 0.972
-n (lateral) RMSE  [m]  0.332   bias -0.116
-s (along) RMSE    [m]  0.356   bias +0.003
-epsi RMSE     [deg]    0.352
-within 0.25 m          41.6 %
-within 0.50 m          78.5 %
-within 1.00 m          95.2 %
+position RMSE  [m]     0.415   <- SCORE (lower is better)
+position median/p95    0.261 / 0.861
+n (lateral) RMSE  [m]  0.210   bias -0.027
+s (along) RMSE    [m]  0.358   bias +0.002
+epsi RMSE     [deg]    0.362
+within 0.25 m          48.2 %
+within 0.50 m          83.8 %
+within 1.00 m          96.6 %
 

@@ -1,13 +1,13 @@
 """Car-state odometry: speed and yaw rate from the allowed signals (wheel speeds + steering), with
 parameters fitted on the training run by camloc/tools/calibrate_odometry.py (camloc/assets/odometry.json).
 
-Speed:   v = r * w, with w chosen per sample to dodge wheel slip: under braking the fronts lock first
-         (use the faster axle), under traction the rears spin (use the front axle).
+Speed:   v = r * w, with the axle chosen by driving phase (wheel_mode 'phase', EXP-0028): under braking the
+         fronts lock first (use the faster axle), otherwise the rears spin (use the front axle, times cos(delta)).
 Yaw rate (kinematic bicycle with understeer and steering lag):
          wz = v * tan(delta(t - lag) - delta0) / (L * (1 + K * v^2))
 Sideslip:  beta0 / beta1 in odometry.json fit the travel direction minus heading = beta0 + beta1 * v * wz on
          training GT (+1.25 deg median at 5-15 m/s^2). The EKF can use it (run.py BETA0_GAIN / BETA1_GAIN), but
-         full gain was not consistently better (EXP-0021); half gain is the default (EXP-0025).
+         the default instead learns sideslip online in the EKF (run.py SLIP_STATE, EXP-0026).
 `source='estimator'` instead uses the fused v_mps / wz_radps fields (allowed by the brief, ADR-0003).
 """
 import json
@@ -20,6 +20,9 @@ from . import config as C
 PARAMS = C.ASSETS / 'odometry.json'
 
 
+BRAKE_PA = 2e5                       # braking-phase threshold on the brake pressure signal (2 bar)
+
+
 def wheel_rate(f, mode):
     fl, fr, rl, rr = f['omega_w_fl'], f['omega_w_fr'], f['omega_w_rl'], f['omega_w_rr']
     front, rear = 0.5 * (fl + fr), 0.5 * (rl + rr)
@@ -29,8 +32,15 @@ def wheel_rate(f, mode):
         return rear
     if mode == 'mean4':
         return 0.25 * (fl + fr + rl + rr)
-    if mode == 'antislip':           # braking: fronts lock -> faster axle; traction: rears spin -> front
+    if mode == 'antislip':           # (legacy) always the faster axle; under traction that is the spinning rear
         return np.where(front < rear, rear, front) if np.ndim(front) else (rear if front < rear else front)
+    if mode == 'phase':              # TASK F (EXP-0028): choose the axle by driving phase
+        # braking (> 2 bar): the fronts lock first -> faster axle; otherwise (traction / coast) the rears spin ->
+        # front axle, projected onto the car's x axis (front wheels roll along the steered direction)
+        fc = front * np.cos(f['delta_wheel_rad'])
+        braking = np.asarray(f['brake']) > BRAKE_PA
+        out = np.where(braking, np.maximum(fc, rear), fc)
+        return out if np.ndim(out) else float(out)
     raise ValueError(mode)
 
 

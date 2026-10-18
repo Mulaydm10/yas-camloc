@@ -79,7 +79,7 @@ def main():
 
     report = {'speed': {}, 'yaw': {}, 'drift_10s': {}}
     radii = {}
-    for mode in ('front', 'rear', 'mean4', 'antislip'):
+    for mode in ('front', 'rear', 'mean4', 'antislip', 'phase'):
         w = wheel_rate(F, mode)
         r = float(np.sum(v_gt[moving] * w[moving]) / np.sum(w[moving] ** 2))
         radii[mode] = r

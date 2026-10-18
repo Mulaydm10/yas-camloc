@@ -54,9 +54,10 @@ class OdomEstimator(Estimator):
     # online sideslip-bias state (TASK D.2, EXP-0026): Gauss-Markov angle added to the travel direction,
     # learned from the map fixes; sigma0 / q in deg (q per sqrt(s)), tau in s
     # SLIP_STATE 1 = b only, 2 = b + c * a_y; clips in deg and deg per m/s^2; Q_LAT lateral process noise
-    SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S, SLIP_CLIP_DEG = 0, 0.5, 0.3, 5.0, 3.0
-    SLIP_C_SIGMA0_DEG, SLIP_C_Q_DEG, SLIP_C_CLIP_DEG, Q_LAT = 0.15, 0.03, 0.3, 0.0
-    BETA0_GAIN, BETA1_GAIN = 0.5, 0.5     # half gain: pooled held-out 0.630 -> 0.586 m, lateral 0.477 -> 0.421 (EXP-0025)
+    # defaults (EXP-0026): b + c * a_y, tau 60 s, steady-state sigma 0.3 deg / 0.15 deg per m/s^2, clips 1 / 0.3
+    SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S, SLIP_CLIP_DEG = 2, 0.3, 0.055, 60.0, 1.0
+    SLIP_C_SIGMA0_DEG, SLIP_C_Q_DEG, SLIP_C_CLIP_DEG, Q_LAT = 0.15, 0.027, 0.3, 0.03
+    BETA0_GAIN, BETA1_GAIN = 0.0, 0.0     # fixed GT-fitted gains replaced by the online slip states (EXP-0025 -> EXP-0026)
 
     def __init__(self, init, cameras, track):
         super().__init__(init, cameras, track)
@@ -252,6 +253,7 @@ class VisualMapLoc(VisualHeading):
         self.stats.update({'map_fixes': 0, 'map_rejected': 0})
         self.last_fix_t = None
         self.n_reject = 0
+        self.n_cons_reject = 0
         self.t0_stress = None
 
     @property
@@ -302,11 +304,23 @@ class VisualMapLoc(VisualHeading):
             r = np.array([mx - x, my - y])
             nis = float(r @ np.linalg.solve(Sxy, r))
             used0 = use
-            if nis > self.NIS_GATE and self.n_reject < self.REJECT_RESET:
+            # cameras that agree with EACH OTHER but not with the filter, several frames running: the filter
+            # diverged (e.g. locked front wheels under braking, EXP-0028), so trust the cameras sooner
+            if nis > self.NIS_GATE and len(use) >= 2:
+                self.n_cons_reject += 1
+            elif nis <= self.NIS_GATE:
+                self.n_cons_reject = 0
+            reset = self.n_reject >= self.REJECT_RESET or (self.CONSENSUS_RESET and self.n_cons_reject >= self.CONSENSUS_RESET)
+            if nis > self.NIS_GATE and not reset:
                 self.n_reject += 1
                 use = []
             else:
-                self.n_reject = 0
+                if nis > self.NIS_GATE:              # re-initialise the position uncertainty around the fix
+                    self.ekf.P[:2, :] = 0.0
+                    self.ekf.P[:, :2] = 0.0
+                    self.ekf.P[:2, :2] = np.outer(r, r) + np.eye(2) * 4.0
+                    self.stats['resets'] = self.stats.get('resets', 0) + 1
+                self.n_reject = self.n_cons_reject = 0
                 self.ekf.update_pose(mx, my, myaw, sxy, syaw)
                 self.stats['map_fixes'] += 1
                 self.last_fix_t = fs.stamp_ns
@@ -343,6 +357,7 @@ class VisualMapLoc(VisualHeading):
 
     # fix quality weighting (EXP-0021): sigma_i = SIGMA_XY * sqrt(Q_REF_INL / inliers) * max(1, rms / Q_REF_RMS)
     QUALITY_W, Q_REF_INL, Q_REF_RMS = 1, 40.0, 1.5     # on: pooled held-out 0.673 -> 0.630 m, lateral 0.495 -> 0.477
+    CONSENSUS_RESET = 0      # >= 2 agreeing cameras NIS-rejected N frames in a row -> reset; 3 caused false resets (EXP-0028), off
     NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
     REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again
 
