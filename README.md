@@ -8,6 +8,33 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 **Results:** see [Results](#results). The full analysis is in `REPORT.md`, and the experiment history is in
 `experiments/experiment_log.md`.
 
+## Submission
+
+| Form item | File |
+|---|---|
+| Hidden-test pose CSV | produced by `./run.sh test.mcap out.csv` (format below) |
+| Validation pose CSVs (strict held-out laps) | [lap 2](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/poses/heldout_lap2_strict.csv), [lap 4](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/poses/heldout_lap4_strict.csv), [lap 6](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/poses/heldout_lap6_strict.csv) |
+| Validation results (official scorer output) | [lap 2](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/validation/lap2_scores.txt), [lap 4](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/validation/lap4_scores.txt), [lap 6](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/validation/lap6_scores.txt), [pooled](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/validation/pooled.txt): 0.513 m position, 0.303 m lateral, 95.1 % within 1 m |
+| Trajectory vs GT on a validation lap | [plot](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/trajectory_lap4.png), [replay video](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/trajectory_lap4.mp4) (held-out lap 4, GT drawn for display only) |
+| Presentation | [slides.pdf](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/slides.pdf) (6 slides), [demo.mp4](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/demo.mp4) (4:39), [script](https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/demo_script.md) |
+| Source + run script | this repository, [`run.sh`](https://github.com/Mulaydm10/yas-camloc/blob/main/run.sh) |
+
+**Pose CSV format.** `timestamp_ns,x,y,yaw,confidence,status`, one row per camera frame. `timestamp_ns` is the image header
+stamp in ns (the organisers' `tools/evaluate.py` requires this column name, so we keep ns). x, y are in m and yaw is in rad,
+for `constructor0/base_link` in the track (`map`) frame. `status` is `lost` for the best-hypothesis poses emitted before the
+global-initialisation lock (32 rows, the first ~3 s of a run), otherwise `ok`. `confidence` = exp(−σ_pos / 1 m), where
+σ_pos = √(P_xx + P_yy) is the EKF position standard deviation (0 while `lost`). Both columns are computed after the estimate
+and never feed back into it. The official scorer reads the six-column file unchanged, with identical scores.
+
+**No learned weights.** Nothing is trained by gradient descent and there are no model files. The only training-derived
+artefacts are the calibrations in `camloc/assets/` (committed) and the visual map, which is derived from the dataset and
+therefore not committed (licence). `run.sh` rebuilds it from the training bag on first use (about 1.6 min on an Apple M4, 4440 keyframes; the rebuilt map is byte-identical to ours).
+The jury points `run.sh` at its copy of the training bag with the third argument:
+`./run.sh test.mcap out.csv /path/to/c0_2026-10-13_22-53-42_camloc_0.mcap`.
+
+**Confirmed:** no future frames (causal, image stamps only), and no ground truth at inference (the GT pose and
+`/tf map->base_link` are never read; `tests/test_smoke.py` fails if inference code imports the GT or scoring modules).
+
 ## Run it
 
 ```bash
@@ -17,7 +44,7 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 - `run.sh` creates the Python 3.12 venv from `requirements.txt` if missing.
 - It builds the training-derived visual map if missing. That needs the training bag; the map is derived from
   the dataset, so it is not committed.
-- It then writes `out.csv` (`timestamp_ns,x,y,yaw`) and `out.run.json`, which holds the per-frame processing
+- It then writes `out.csv` (`timestamp_ns,x,y,yaw,confidence,status`; see "Submission" below) and `out.run.json`, which holds the per-frame processing
   time and the hardware.
 - **No starting pose is needed (or read).** The localiser finds its own first pose by matching the cameras
   against the whole visual map (global initialisation: a provisional lock from two cameras agreeing in one frame

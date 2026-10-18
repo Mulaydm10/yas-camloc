@@ -1,4 +1,4 @@
-"""Single entry point: raw MCAP -> submission CSV (timestamp_ns,x,y,yaw), causally.
+"""Single entry point: raw MCAP -> submission CSV (timestamp_ns,x,y,yaw,confidence,status), causally.
 
     python -m camloc.run --out sub.csv                       # whole run, default estimator
     python -m camloc.run --out sub.csv --start 600 --duration 100 --estimator hold
@@ -718,13 +718,13 @@ def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=No
         pose = est.on_frames(ev)
         proc.append(time.perf_counter() - t)
         if pose is not None:
-            rows.append((ev.stamp_ns, *pose))
+            rows.append((ev.stamp_ns, *pose, *pose_quality(est)))
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, 'w') as f:
-        f.write('timestamp_ns,x,y,yaw\n')
-        for t_, x, y, yaw in rows:
-            f.write(f'{int(t_)},{x:.4f},{y:.4f},{yaw:.6f}\n')
+        f.write('timestamp_ns,x,y,yaw,confidence,status\n')
+        for t_, x, y, yaw, conf, st in rows:
+            f.write(f'{int(t_)},{x:.4f},{y:.4f},{yaw:.6f},{conf:.3f},{st}\n')
     proc = np.array(proc) * 1e3
     info = {'estimator': estimator, 'state': state, 'frames': len(proc), 'poses': len(rows), 'state_samples': n_state,
             'late_drops': rp.late_drops, 'estimator_stats': getattr(est, 'stats', None), 'ms_per_frame_mean': float(proc.mean()) if len(proc) else None,
@@ -732,6 +732,18 @@ def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=No
             'hardware': f'{platform.machine()} {platform.processor() or ""} {platform.platform()}'.strip()}
     out.with_suffix('.run.json').write_text(json.dumps(info, indent=1))
     return info
+
+
+def pose_quality(est):
+    """Submission-form columns, read-only (they never feed back into the estimate):
+    status 'lost' while no lock exists (the never-silent best-hypothesis poses before the global-init lock), else 'ok';
+    confidence = exp(-sigma_pos / 1 m), sigma_pos = sqrt(P_xx + P_yy) of the EKF (0 while lost)."""
+    if getattr(est, 'need_init', False):
+        return 0.0, 'lost'
+    ekf = getattr(est, 'ekf', None)
+    if ekf is None:
+        return 1.0, 'ok'
+    return float(np.exp(-np.sqrt(max(ekf.P[0, 0] + ekf.P[1, 1], 0.0)))), 'ok'
 
 
 def main(argv=None):

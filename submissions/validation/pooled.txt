@@ -1,0 +1,4 @@
+# Pooled over the three STRICT held-out laps (each fold: visual map + every calibration rebuilt without the scored lap)
+# pose RMSE pooled over all evaluated poses (sqrt of the mean squared error), organiser tools/evaluate.py error definition
+pooled laps 2/4/6   n 3784   position RMSE 0.513 m   lateral RMSE 0.303 m   within 1 m 95.1 %
+lap 2  n 1645  0.598 m   lap 4  n 989  0.460 m   lap 6  n 1150  0.415 m

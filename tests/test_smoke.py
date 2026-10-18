@@ -367,3 +367,12 @@ def test_revoke_needs_consistent_alternative():
     assert alt is not None and abs(alt[0] - 12.3) < 1e-6
     m._prov = {'alt': [((1.0 + 0.3 * k, 0.1, 0.01), ref) for k in range(3)]}      # consistent but close: noise
     assert m._alternative() is None
+
+
+def test_pose_quality_columns():
+    """TASK N: form columns. 'lost' (confidence 0) before the lock, else 'ok' with exp(-sigma_pos / 1 m)."""
+    from types import SimpleNamespace
+    from camloc.run import pose_quality
+    assert pose_quality(SimpleNamespace(need_init=True)) == (0.0, 'lost')
+    c, st = pose_quality(SimpleNamespace(need_init=False, ekf=SimpleNamespace(P=np.diag([0.09, 0.16, 0.0, 0.0]))))
+    assert st == 'ok' and abs(c - np.exp(-0.5)) < 1e-12

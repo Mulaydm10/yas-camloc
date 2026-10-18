@@ -1,7 +1,7 @@
 # STATE.md - live snapshot (OVERWRITE every session)
 
 If STATE and `worklog.md` disagree about what is true *now*, STATE wins; the worklog explains how we got here.
-Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
+Deadline: see `COMPETITION.md` (2026-10-18 23:59 CEST). Owner to-do: make the repo PUBLIC, submit the form.
 
 ## Done
 - Dataset analysis (`REPORT.md` §0-9), D1 package, D2 odometry + EKF, D3 camera geometry (pivot, §10), D4 visual heading.
@@ -12,7 +12,8 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - Freeze pass (Devin TASK C): clean clone of `f49ab7f` -> byte-identical map, 100 % coverage, 20.3 ms/frame mean (M4 CPU) (`submissions/README.md`).
 - Devin review loop (issues #1, #2; protocol TASK -> ACK -> DONE): tasks A-H done. H: real speed blur is small (front exposure ~0.5-1 ms, EXP-0030/0031); no fallback change beat the default (EXP-0032). Open risk: anything that removes map fixes (glare) -> 2-5 m dead reckoning.
 - Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
-- Submission README with results and plots (`docs/`); 26 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
+- TASK M/N: slides.pdf (6), demo.mp4 (4:39), demo_script.md; pose CSV `timestamp_ns,x,y,yaw,confidence,status` (scores identical); submissions/poses, validation (+ pooled), trajectory_lap4.png/.mp4; README "Submission" section. Team Rogue Ravens.
+- Submission README with results and plots (`docs/`); 27 tests green; pushed to github.com/Mulaydm10/yas-camloc (private).
 
 ## In flight
 - (none) - submission frozen at f314e61 (estimator); run.sh with no flags works on both layouts (submissions/README.md)
