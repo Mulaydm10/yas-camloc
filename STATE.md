@@ -22,16 +22,16 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
 
 ## Next intended step
-1. Freeze holds at the current default (strict pooled 0.513 / 0.303 / 95.1 %); only bug fixes or a new Devin/owner TASK.
-2. Owner: slides from `docs/SLIDES.md`; exact submission time/timezone into `COMPETITION.md` (last work day 2026-10-18).
+1. Owner: slides from `docs/SLIDES.md`; exact submission time / timezone (last work day 2026-10-18).
+2. Wait for Devin / owner TASKs; the default is frozen at the TASK C state (no default changed since `f49ab7f`).
 3. When the hidden test file arrives: `./run.sh <test.mcap> submissions/test_poses.csv` (`-- --init x,y,yaw` if no /tf).
 
 ## Latest experiment
-EXP-0032: H.2 fallback variants (reset, corner bounds, wheel-scale state, DCS), none adopted; default passes wrong-fix injection.
+EXP-0034: LK map-point tracking rejected; TASK H closed with no default change (EXP-0030..0034).
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |
 |---|---|---|---|
 | (none) | | | |
 
-Last updated: 2026-10-18 08:25 CEST (by Claude Opus, overnight session in screen `camloc`)
+Last updated: 2026-10-18 10:10 CEST (by Claude Opus, session in screen `camloc`)

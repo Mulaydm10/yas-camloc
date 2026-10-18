@@ -79,3 +79,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - H.3: map-point tracking and lower FAST threshold explored; cannot seed under synthetic heavy blur; parked (default off).
 - H.2: gated reset, corner lateral bounds, online wheel-scale state, DCS soft gate; plus wrong-fix injection test. None adopted (no clear win on normal + stress); default passes wrong-fix injection. Phase odometry has ~0 signed speed bias.
 - Session restart mid-way (runs survived); orphan watcher cleaned; EXP timestamps corrected.
+
+## 2026-10-18 10:10 CEST - Claude (Opus, screen session) - Devin TASK H (EXP-0030..0034)
+- H.1: real blur does not grow with speed; a physical flow-field blur fitted to real sharpness gives front exposure ~0.5-1 ms; the V/3 px stress rows relabelled as an unphysical worst case.
+- H.2: blackout regression traced (+6 % whole run; lap 4 window = phase-odometry trade-off). Gated reset, corner bounds, online wheel scale and DCS soft gate tested on strict folds + blackouts + wrong-fix injection: none passes.
+- H.3: LK map-point tracking (age-scaled sigma) rejected; full-pipeline glare costs lap 4 0.46 -> 1.12 m.
+- Defaults unchanged since f49ab7f; all options default-off and documented.
