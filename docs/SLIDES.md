@@ -13,6 +13,7 @@ lap, processing is causal, and only the allowed car signals are used.
 - Wheel speeds and steering feed a calibrated bicycle model (EKF predict).
 - `fl` / `fr` / `r` images feed two updates: keyframe rotation (LK + essential matrix) for relative yaw, and
   ORB features (CLAHE) matched to the 3D map, solved with PnP + RANSAC, as an absolute fix weighted by quality.
+- No starting pose: global search of the whole map, locked on multi-frame consensus (0 wrong locks in 16 starts).
 - Gates: cross-camera consensus, then an NIS test with recovery; the track model handles the pit lane and gives
   heading/lateral priors only when there are no fixes.
 - (Diagram: README "Method".)

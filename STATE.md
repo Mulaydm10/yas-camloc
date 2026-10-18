@@ -7,6 +7,7 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - Dataset analysis (`REPORT.md` §0-9), D1 package, D2 odometry + EKF, D3 camera geometry (pivot, §10), D4 visual heading.
 - D5 done: geo-referenced ORB map (CLAHE) + quality-weighted PnP fixes, EKF with online sideslip states, braking-aware (phase) wheel odometry (`--estimator vismap`, `./run.sh`).
   **Strict** held-out validation (map AND odometry calibration rebuilt without the scored lap): lap 2 0.598 m, lap 4 0.460 m, lap 6 0.415 m, **pooled 0.513 m, lateral 0.303 m, 95.1 % within 1 m** (EXP-0026..0028).
+- TASK I (deadline-critical): no starting pose in the test file -> global initialisation + re-localisation (EXP-0036); test-domain layout without state_estimation / tf / track_bounds (validation/twist, bounds asset); run.sh Python >= 3.10 fallback. Strict auto-init 0.513 / 0.303 / 95.1 %, 0 wrong locks in 16 mid-lap starts. Devin crash test on the organisers' sample: 84 ms/frame, 74/74 1-s bins.
 - Freeze pass (Devin TASK C): clean clone of `f49ab7f` -> byte-identical map, 100 % coverage, 20.3 ms/frame mean (M4 CPU) (`submissions/README.md`).
 - Devin review loop (issues #1, #2; protocol TASK -> ACK -> DONE): tasks A-H done. H: real speed blur is small (front exposure ~0.5-1 ms, EXP-0030/0031); no fallback change beat the default (EXP-0032). Open risk: anything that removes map fixes (glare) -> 2-5 m dead reckoning.
 - Organiser update (`23-00-38_cut_120m_update.zip`) analysed: `map.mcap` lines, (s, n) scorer integrated (`evaluate.py --sn`).
@@ -22,16 +23,15 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 - A GitHub reviewer will look at the repo: add them as a collaborator (private repo) once the user gives the username.
 
 ## Next intended step
-1. Owner: slides from `docs/SLIDES.md`; exact submission time / timezone (last work day 2026-10-18).
-2. Wait for Devin / owner TASKs; the default is frozen at the TASK C state (no default changed since `f49ab7f`).
-3. When the hidden test file arrives: `./run.sh <test.mcap> submissions/test_poses.csv` (`-- --init x,y,yaw` if no /tf).
+1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): make the repo PUBLIC; submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
+2. Devin: final crash test of the latest main on the organisers' sample.
 
 ## Latest experiment
-EXP-0034: LK map-point tracking rejected; TASK H closed with no default change (EXP-0030..0034).
+EXP-0036: global initialisation, strict auto-init 0.513 / 0.303 / 95.1 %, 0 wrong locks in 16 starts.
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |
 |---|---|---|---|
 | (none) | | | |
 
-Last updated: 2026-10-18 10:10 CEST (by Claude Opus, session in screen `camloc`)
+Last updated: 2026-10-18 17:50 CEST (by Claude Opus, SSH session)

@@ -89,3 +89,9 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 ## 2026-10-18 13:40 CEST - Claude (Opus, screen session 57650) - duplicate-session cleanup
 - A forked duplicate session (screen 68230) had worked TASK H in parallel on the same working tree (commits 280a091, 79c87e2; "DONE H.2" on #2 at 06:18 UTC). Peer session national-18 closed it on the owner's instruction; this session is now the only one working with Devin.
 - Its EXP-0032 row duplicated an ID; renumbered to EXP-0035 with a provenance note (content overlaps EXP-0032/0033). No code conflict: the history is linear, and defaults are unchanged since f49ab7f.
+
+## 2026-10-18 17:50 CEST - Claude (Opus) - TASK I: no starting pose (EXP-0036)
+- Organisers (via Devin): the test file has no starting pose; the sample layout has no state_estimation, /tf or track_bounds; deadline 23:59 CEST; the repo must be public.
+- Global initialisation over the whole map, locked on multi-frame consensus; no pose before the lock; re-localisation after 15 s without fixes (time-boxed: one camera per attempt). First lock rule gave 2/16 wrong locks; stricter rule gives 0/16. Strict laps 2/4/6 identical to GT init.
+- I.0: topic resolution by suffix, bounds asset fallback (exported by run.sh), validation/twist as the state input when state_estimation is absent; run.sh falls back to Python >= 3.10 with requirements-compat.txt (tested on 3.10).
+- Devin crash-tested the organisers' sample: right format, 74/74 1-s bins, 84 ms/frame after time-boxing.

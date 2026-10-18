@@ -52,11 +52,17 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
      (`tools/build_map.py`).
    - At run time, per-camera PnP + RANSAC, gated by cross-camera consensus and an NIS test that can recover
      if the filter itself is wrong.
-4. **Track model.**
+4. **Global initialisation and re-localisation** (no starting pose is given).
+   - Every keyframe of the whole map is searched with descriptor votes, then PnP is run on the best
+     candidates.
+   - A pose is locked only after 3 odometry-consistent frames, at least one with two cameras agreeing.
+   - On 16 held-out mid-lap starts it locks in 0.2–4.5 s at 0.02–1.8 m, with no wrong lock (EXP-0036).
+     Lap scores are identical to starting from the true pose.
+5. **Track model.**
    - The surveyed borders give the track and pit-lane centrelines, with (s, n) projection that respects heading.
    - Lane membership is tracked and switches at the pit branch points only when the car is slow, at pit speed.
    - The 3D borders give the road z, roll and pitch.
-5. **Camera self-calibration.**
+6. **Camera self-calibration.**
    - Rotation corrections of 1° or less per camera, fitted on training GT (`tools/calibrate_cameras.py`).
    - Ego-body masks are hand-drawn polygons (`camloc/assets/body_polygons.json`).
 
