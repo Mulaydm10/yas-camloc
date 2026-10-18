@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>camloc slides</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=block" rel="stylesheet">
+<style>
+:root{--page:#F1ECE1;--surface:#F9F6EE;--surface2:#E7E0D1;--well:#ECE5D6;--grid:#E3DCCB;--ink:#211E18;--ink2:#4E4A3F;--ink3:#686457;
+--line:#CFC5AE;--line2:#A99F87;--accent:#2B59D1;--soft:rgba(43,89,209,.10);--peri:#D2DBF4;--ok:#1B6B33;--okt:rgba(27,107,51,.12);
+--warn:#855504;--warnt:rgba(169,112,10,.16);--crit:#B93232;--critt:rgba(199,58,58,.12)}
+@page{size:1920px 1080px;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--page)}
+body{font-family:"Source Serif 4",Georgia,serif;color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.slide{width:1920px;height:1080px;position:relative;overflow:hidden;page-break-after:always;break-after:page;
+ background-color:var(--page);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+ background-size:48px 48px;background-position:-1px -1px}
+.banner{position:absolute;left:0;right:0;top:0;height:56px;background:var(--ink);color:#F1ECE1;display:flex;align-items:center;gap:28px;padding:0 64px;
+ font:600 17px/1 "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase}
+.banner .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:10px}
+.banner .r{margin-left:auto;color:#B9B19E}
+.coord{position:absolute;font:400 14px "JetBrains Mono",monospace;color:var(--ink3);letter-spacing:.1em}
+.frame{position:absolute;left:64px;right:64px;top:96px;bottom:72px}
+.crop{position:absolute;width:22px;height:22px;border-color:var(--line2);border-style:solid;border-width:0}
+.crop.tl{left:40px;top:80px;border-left-width:2px;border-top-width:2px}.crop.tr{right:40px;top:80px;border-right-width:2px;border-top-width:2px}
+.crop.bl{left:40px;bottom:52px;border-left-width:2px;border-bottom-width:2px}.crop.br{right:40px;bottom:52px;border-right-width:2px;border-bottom-width:2px}
+.eyebrow{font:600 18px "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font:400 84px/1.02 "Instrument Serif",serif;letter-spacing:-.01em;margin-top:14px}
+h1 em{font-style:italic;color:var(--accent)}
+h2{font:400 60px/1.05 "Instrument Serif",serif;margin-top:12px}
+h2 em{font-style:italic;color:var(--accent)}
+p,li{font-size:25px;line-height:1.42;color:var(--ink2)}
+.mono{font-family:"JetBrains Mono",monospace}
+.card{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:26px 30px;position:relative}
+.label{font:600 14px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.pill{display:inline-block;border:1.5px dashed var(--line2);border-radius:999px;padding:6px 14px;font:600 14px "JetBrains Mono",monospace;
+ letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);background:var(--surface)}
+.pill.blue{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+.scope{position:absolute;left:64px;right:64px;bottom:20px;font:400 15px/1.35 "JetBrains Mono",monospace;color:var(--ink3)}
+.scope b{color:var(--ink2);font-weight:600}
+.big{font:400 92px/1 "Instrument Serif",serif;color:var(--ink)}
+.big small{font:400 30px "JetBrains Mono",monospace;color:var(--ink3);margin-left:6px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.kpi .label{margin-bottom:12px}
+.kpi.hero{background:var(--ink);border-color:var(--ink)}.kpi.hero .big{color:#F9F6EE}.kpi.hero .label{color:#B9B19E}.kpi.hero .big small{color:#B9B19E}
+table{border-collapse:collapse;width:100%;font:400 22px "JetBrains Mono",monospace}
+td,th{padding:10px 14px;border-bottom:1.5px solid var(--line);text-align:left}
+th{font:600 14px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+td.n{text-align:right}
+.flow{display:flex;align-items:stretch;gap:0}
+.node{background:var(--surface);border:2px solid var(--line2);border-radius:12px;padding:18px 20px;font:400 22px/1.32 "Source Serif 4",serif;color:var(--ink)}
+.node .label{display:block;margin-bottom:6px;font-size:12px}
+.node.acc{border-color:var(--accent);background:var(--peri)}
+.arrow{align-self:center;width:34px;height:2px;background:var(--line2);position:relative;flex:none}
+.arrow:after{content:"";position:absolute;right:-1px;top:-5px;border:6px solid transparent;border-left:9px solid var(--line2)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.crit{color:var(--crit)}
+.tag{display:inline-block;border-radius:8px;padding:3px 10px;font:600 15px "JetBrains Mono",monospace;letter-spacing:.06em}
+.tag.ok{background:var(--okt)}.tag.warn{background:var(--warnt)}.tag.crit{background:var(--critt)}
+ul{list-style:none}
+ul li{position:relative;padding-left:26px;margin:8px 0}
+ul li:before{content:"";position:absolute;left:0;top:15px;width:10px;height:10px;border:2px solid var(--accent);border-radius:2px}
+img{display:block}
+</style>
+</head>
+<body>
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>No start pose · 16 starts</span><span class="r">Video sheet</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">16 mid-lap starts · no start pose</div>
+  <h2>Every start <em>ends correct</em>.</h2>
+  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:26px;margin-top:26px">
+   <div class="card" style="padding:10px"><img src="../build/fig_midlap.png" style="width:100%"></div>
+   <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card"><div class="label">Lock time</div><div class="big">0.0–1.8<small>s</small></div></div>
+    <div class="card"><div class="label">End correct</div><div class="big" style="color:var(--ok)">16 / 16</div></div>
+    <div class="card"><div class="label">Aliased locks corrected</div><p style="font-size:22px;margin-top:6px">13.6 m off → switch after <b>0.3 s</b><br>9.9 m off → converges by <b>11 s</b></p></div>
+   </div>
+  </div>
+ </div>
+ <div class="scope"><b>Scope:</b> 40 s windows starting at 10, 30, 50, 70 and 90 % of held-out laps 2 / 4 / 6, plus one pit start; strict assets for each lap. Ground truth is used for scoring only.</div>
+</section></body></html>

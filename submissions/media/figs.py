@@ -186,7 +186,7 @@ def fig_midlap():
     return min(lt), max(lt)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and 'anim' not in sys.argv[0]:
     fig_traj(4)
     fig_rig()
     fig_progression()

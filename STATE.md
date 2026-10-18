@@ -25,7 +25,7 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 
 ## Next intended step
 1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): make the repo PUBLIC; submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
-2. FROZEN: estimator f314e61, verified by Devin on the sample (strict lock 0.6 s, 74/74 bins). No more estimator changes; docs only.
+2. Deliverables done: submissions/slides.pdf, demo.mp4, demo_script.md (TASK M). FROZEN: estimator f314e61, verified by Devin on the sample (strict lock 0.6 s, 74/74 bins). No more estimator changes; docs only.
 
 ## Latest experiment
 EXP-0039: pair-free 3-frame provisional lock restored (daylight sample fix); strict 0.513 / 0.303 / 95.1 %; 16/16 starts end correct.

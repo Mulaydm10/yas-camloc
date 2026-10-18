@@ -1,0 +1,221 @@
+[
+ {
+  "id": "01",
+  "src": "slide1.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Where is the race car, using only its cameras?",
+    "cap": "Where is the race car, using only its cameras?",
+    "at": 0.8
+   },
+   {
+    "vo": "camloc estimates position and heading ten times a second around Yas Marina, with no GNSS, no LiDAR, and no starting pose.",
+    "cap": "x, y and heading at 10 Hz around Yas Marina. No GNSS, no LiDAR, no starting pose.",
+    "at": null
+   },
+   {
+    "vo": "On held-out night laps, where the map and every calibration exclude the scored lap, the position error is zero point five one metres, lateral zero point three, and ninety-five percent of poses are within one metre.",
+    "cap": "Held-out night laps, map and calibration without the scored lap: 0.51 m position, 0.30 m lateral, 95.1 % within 1 m.",
+    "at": null
+   },
+   {
+    "vo": "These are held-out training laps, not a hidden-test result.",
+    "cap": "Held-out training laps, not a hidden-test result.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "02",
+  "src": "slide2.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Why not just odometry? Wheel speeds and steering alone drift more than a hundred metres, even from the true start.",
+    "cap": "Odometry alone: 107 m RMSE over the run, even from the true start pose.",
+    "at": 0.6
+   },
+   {
+    "vo": "Seven cameras watch the track at night. Three of them, front left, front right and rear, carry the map fixes.",
+    "cap": "7 cameras at night; fl, fr and r carry the map fixes.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "03",
+  "src": "slide3.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "The pipeline is classical and causal. Odometry predicts, and keyframe optical flow gives the relative heading.",
+    "cap": "Classical and causal: odometry predicts, keyframe optical flow gives relative heading.",
+    "at": 0.6
+   },
+   {
+    "vo": "ORB features, matched against a geo-referenced map built from the training laps, give absolute fixes by PnP and RANSAC on each camera.",
+    "cap": "ORB features vs a geo-referenced map: absolute fixes by PnP + RANSAC per camera.",
+    "at": null
+   },
+   {
+    "vo": "Cross-camera consensus and a statistical gate decide what reaches the Kalman filter, which also learns the car's sideslip online.",
+    "cap": "Consensus and a NIS gate feed an EKF that learns sideslip online.",
+    "at": null
+   },
+   {
+    "vo": "With no start pose, it searches the whole map, takes a provisional lock, and then confirms it, or switches to a consistent alternative.",
+    "cap": "No start pose: global search, provisional lock, then confirm or switch.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "04",
+  "src": "terminal.mp4",
+  "start": 0.5,
+  "end": 11.5,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "A live run on held-out lap four. The map and the calibration were rebuilt without that lap, and no start pose is given.",
+    "cap": "Live run, held-out lap 4: map + calibration rebuilt without it, no start pose.",
+    "at": 0.8
+   }
+  ]
+ },
+ {
+  "id": "05",
+  "src": "terminal.mp4",
+  "start": 34.6,
+  "end": 55.6,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "About a thousand frames, at around twenty-five milliseconds each, locked on the first frame.",
+    "cap": "1060 frames at ~25 ms each (25 s of processing cut), locked on the first frame.",
+    "at": 0.5
+   },
+   {
+    "vo": "The official scorer reports zero point four six metres, and ninety-six point seven percent of poses within one metre on this lap.",
+    "cap": "Official scorer: 0.461 m position RMSE, 96.7 % within 1 m on lap 4.",
+    "at": 7.5
+   }
+  ]
+ },
+ {
+  "id": "06",
+  "src": "traj_lap4.mp4",
+  "start": 0,
+  "end": 26.7,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Here is that lap replayed at four times speed. The blue estimate stays on the ground-truth ring, which is drawn for display only.",
+    "cap": "Lap 4 at 4x speed. Ground truth drawn for display only.",
+    "at": 1.0
+   },
+   {
+    "vo": "The error stays well under a metre, with short spikes above it, and the running error ends at zero point four six metres.",
+    "cap": "Mostly well under 1 m, short spikes above; final RMSE 0.461 m.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "07",
+  "src": "slide4.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Across the three held-out laps: zero point six, zero point four six, and zero point four two metres.",
+    "cap": "Held-out laps 2 / 4 / 6: 0.598 / 0.460 / 0.415 m.",
+    "at": 0.6
+   },
+   {
+    "vo": "Each development step was kept only if the held-out error went down, from one point zero six to zero point five one metres.",
+    "cap": "Each step kept only if held-out error fell: 1.06 to 0.51 m.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "08",
+  "src": "nostart.mp4",
+  "start": 0,
+  "end": 21.2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "No start pose. At seventy percent of lap six, two cameras agree on a look-alike place, thirteen and a half metres off.",
+    "cap": "Lap 6 at 70 %: two cameras agree on a look-alike place 13.6 m off.",
+    "at": 0.5
+   },
+   {
+    "vo": "The lock is only provisional. Within a third of a second, three rejected fixes agree with each other elsewhere, and the filter switches to them.",
+    "cap": "Provisional lock. Within 0.3 s, three rejected fixes agree elsewhere: switch.",
+    "at": 7.0
+   },
+   {
+    "vo": "Two accepted fixes then confirm it.",
+    "cap": "Two accepted fixes confirm it.",
+    "at": 15.6
+   }
+  ]
+ },
+ {
+  "id": "09",
+  "src": "slidemid.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Over sixteen mid-lap starts, every run locks within two seconds, and all sixteen end correct.",
+    "cap": "16 mid-lap starts: lock within 1.8 s, 16 / 16 end correct.",
+    "at": 0.6
+   }
+  ]
+ },
+ {
+  "id": "10",
+  "src": "slide5.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "Honest limits. Injected wrong fixes barely matter, but without map fixes the error grows: about two point seven metres over thirty seconds, and five over a minute.",
+    "cap": "Limits: without map fixes, 2.7 m over 30 s and 5.2 m over 60 s (lap 4).",
+    "at": 0.6
+   },
+   {
+    "vo": "On the organisers' daylight sample, which has no ground truth, we only checked structure. It locks at zero point six seconds and covers every second, but accepts few fixes, so it relies more on dead reckoning.",
+    "cap": "Daylight sample, no ground truth: structural check only. Locks at 0.6 s, 74 / 74 seconds covered, few fixes.",
+    "at": null
+   }
+  ]
+ },
+ {
+  "id": "11",
+  "src": "slide6.mp4",
+  "start": 0,
+  "end": 2,
+  "speed": 1.0,
+  "pieces": [
+   {
+    "vo": "It all runs with one command, on both topic layouts, on a laptop CPU. The code, the experiment log and the strict validation protocol are in the repository.",
+    "cap": "One command, both topic layouts, CPU only. github.com/Mulaydm10/yas-camloc",
+    "at": 0.6
+   }
+  ]
+ }
+]
