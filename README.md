@@ -1,12 +1,95 @@
-# yas-camloc: camera-based localisation on the Yas Marina track
+<p align="center"><img src="docs/readme/hero.svg" alt="camloc: camera-only localisation on Yas Marina" width="100%"></p>
 
-**Team Rogue Ravens**: Tamo Schäfers, Dhruv Mulay, Gagan Karthik Sripuram, Taa-seen Ahmed.
+<p align="center">
+<img alt="Python 3.10-3.12" src="https://img.shields.io/badge/python-3.10--3.12-2B59D1?style=flat-square">
+<img alt="CPU only" src="https://img.shields.io/badge/runs%20on-CPU%20only-211E18?style=flat-square">
+<img alt="causal" src="https://img.shields.io/badge/causal-online%20only-1B6B33?style=flat-square">
+<img alt="no GT at inference" src="https://img.shields.io/badge/ground%20truth-never%20at%20inference-1B6B33?style=flat-square">
+<img alt="no start pose" src="https://img.shields.io/badge/start%20pose-not%20needed-855504?style=flat-square">
+<img alt="27 tests" src="https://img.shields.io/badge/tests-27%20passing-1B6B33?style=flat-square">
+<img alt="MIT" src="https://img.shields.io/badge/license-MIT-686457?style=flat-square">
+</p>
+
+<p align="center">
+<b><a href="https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/slides.pdf">Slides</a></b> &nbsp;·&nbsp;
+<b><a href="https://drive.google.com/file/d/1IMbsoWdDjTM87MPVoOgOlCoiCfW6adw9/view?usp=sharing">Video (4:39)</a></b> &nbsp;·&nbsp;
+<b><a href="https://drive.google.com/file/d/1VIL1U20j1YQYrW2CmlARg6J6YRSCXCMO/view?usp=sharing">Trajectory vs GT</a></b> &nbsp;·&nbsp;
+<b><a href="https://github.com/Mulaydm10/yas-camloc/blob/main/submissions/validation/pooled.txt">Validation scores</a></b> &nbsp;·&nbsp;
+<b><a href="#submission">Submission</a></b>
+</p>
+
+<p align="center"><b>Team Rogue Ravens</b>: Tamo Schäfers · Dhruv Mulay · Gagan Karthik Sripuram · Taa-seen Ahmed</p>
 
 Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estimates the race car's 2D pose
 (`x, y, yaw` of `constructor0/base_link` in `map`) at camera rate from its 7 cameras. It runs on CPU in real time.
 
-**Results:** see [Results](#results). The full analysis is in `REPORT.md`, and the experiment history is in
-`experiments/experiment_log.md`.
+---
+
+## 🏁 See it drive
+
+<p align="center"><img src="docs/readme/replay_lap4.gif" alt="Held-out lap 4 replay: camloc estimate vs ground truth" width="100%"></p>
+
+<p align="center"><i>Held-out lap 4 at ×4 speed. The map and every calibration were rebuilt <b>without</b> this lap, and no start pose was given.
+The trail is coloured by position error; ground truth is drawn for display only.</i></p>
+
+| | position RMSE | lateral RMSE | heading RMSE | within 1 m | coverage | time / frame |
+|:-|:-:|:-:|:-:|:-:|:-:|:-:|
+| **strict held-out laps 2 / 4 / 6, pooled** | **0.513 m** | **0.303 m** | **0.31°** | **95.1 %** | 99.8 % | **~22 ms** (M4 CPU) |
+
+<i>Scope: night training run, each lap held out in turn. These are validation numbers, not a hidden-test result.</i>
+
+## 🧭 The idea: a rally co-driver with a pace-note book
+
+<p align="center"><img src="docs/readme/slide3.jpg" alt="The co-driver analogy mapped onto the pipeline" width="100%"></p>
+
+| The co-driver… | …is this block in camloc |
+|:-|:-|
+| 🧮 counts distance and turns from speed and steering (smooth, but it drifts) | wheel/twist **odometry** + keyframe **relative yaw** |
+| 📍 recognises a landmark and snaps back to the map | **geo-referenced ORB map** + **PnP/RANSAC** per camera |
+| 🧠 judges each sighting and rejects look-alikes | **cross-camera consensus** + **NIS gate** + **EKF** with online sideslip |
+| 🔄 dropped mid-stage: looks around, commits provisionally, changes its mind | **global search → provisional lock → confirm / switch** |
+
+## 🔄 No start pose? It finds itself, and fixes its own mistakes
+
+<p align="center"><img src="docs/readme/no_start_pose.gif" alt="Aliased provisional lock, switch and confirmation" width="100%"></p>
+
+<p align="center"><i>Started at 70 % of held-out lap 6 with no pose. Two cameras agree on a look-alike place 13.6 m away (provisional lock);
+within 0.3 s three rejected fixes agree elsewhere and the filter switches; two accepted fixes confirm. <b>16 / 16</b> mid-lap starts end correct.</i></p>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/readme/fig_midlap.png" alt="16 mid-lap starts"><br><i>16 mid-lap starts: lock within 1.8 s, every one ends correct.</i></td>
+<td width="50%"><img src="docs/readme/fig_deadreckon.png" alt="odometry alone drifts"><br><i>Why the map matters: odometry alone drifts to 107 m RMSE, even from the true start.</i></td>
+</tr>
+<tr>
+<td><img src="docs/readme/fig_progression.png" alt="progression"><br><i>Every step was kept only if held-out error fell: 1.06 → 0.51 m.</i></td>
+<td><img src="docs/readme/fig_rig.png" alt="camera rig"><br><i>The rig: 7 cameras; front-left, front-right and rear carry the map fixes.</i></td>
+</tr>
+</table>
+
+## 🖥️ One command
+
+```bash
+./run.sh test.mcap out.csv            # no flags, both topic layouts, builds the venv + visual map on first use
+```
+
+<details>
+<summary><b>▶ Watch a live held-out run + the official scorer</b></summary>
+<p align="center"><img src="docs/readme/live_run.gif" alt="terminal: held-out lap 4 run and official scorer" width="100%"></p>
+</details>
+
+<details>
+<summary><b>📑 Slide gallery</b> (methodology, results, failure cases and lessons)</summary>
+
+<img src="docs/readme/slide1.jpg" alt="slide 1" width="100%">
+<img src="docs/readme/slide4.jpg" alt="slide 4: why each choice" width="100%">
+<img src="docs/readme/slide5.jpg" alt="slide 5: results" width="100%">
+<img src="docs/readme/slide6.jpg" alt="slide 6: failure cases and lessons" width="100%">
+</details>
+
+**More:** full analysis in `REPORT.md`, experiment history in `experiments/experiment_log.md`, results tables in [Results](#results).
+
+---
 
 ## Submission
 
