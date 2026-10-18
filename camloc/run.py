@@ -296,6 +296,10 @@ class VisualMapLoc(VisualHeading):
     # hypothesis of GI_FRAMES consecutive frames agreeing after odometry propagation; it must lie on a lane.
     GI_AGREE_M, GI_AGREE_DEG, GI_FRAMES, GI_LANE_MARGIN = 2.0, 5.0, 3, 2.0
     GI_EMIT_HYP = 0                      # 1 = emit the best hypothesis before the lock from the first frame
+    # 1 = the 3-frame lock also needs a two-camera pair in one of the frames (EXP-0036). TASK L: off, because in
+    # daylight the cameras rarely agree pairwise and this blocked every early lock on the organisers' sample;
+    # an aliased 3-frame lock is now provisional and corrected by confirm/switch
+    GI_REQUIRE_PAIR = 0
     # pre-lock time box (s from the first frame): full 3-camera search until GI_FULL_S, then one camera per frame;
     # relaxed (temporal-only) lock from GI_SOFT_S; lock to the best-supported hypothesis at GI_HARD_S; emit the best
     # hypothesis from GI_EMIT_AFTER_S. Night training starts lock strictly within 4.5 s (EXP-0036).
@@ -365,7 +369,7 @@ class VisualMapLoc(VisualHeading):
         self._gi_hist = self._gi_hist[-self.GI_FRAMES:]
         if cand is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
             return None
-        if not relaxed and not any(h[3] for h in self._gi_hist):
+        if not relaxed and self.GI_REQUIRE_PAIR and not any(h[3] for h in self._gi_hist):
             return None
         now = cand
         best = cand

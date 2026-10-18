@@ -55,14 +55,14 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
 4. **Global initialisation and re-localisation** (no starting pose is given).
    - Every keyframe of the whole map is searched with descriptor votes, then PnP is run on the best
      candidates.
-   - Two cameras agreeing in one frame give a *provisional* lock with an honest 3 m uncertainty. If no frame
-     agrees, the time-boxed search falls back to a 3-frame odometry-consistent lock at 6 s, then to the
-     best-supported hypothesis at 10 s.
+   - A *provisional* lock with an honest 3 m uncertainty comes from two cameras agreeing in one frame, or from
+     the best hypotheses of 3 consecutive frames agreeing after odometry propagation. The time-boxed search then
+     falls back to a relaxed lock at 6 s and to the best-supported hypothesis at 10 s.
    - Two accepted map fixes confirm the lock. It is revoked only on positive evidence: at least 3 rejected fixes
      that agree with each other on a pose at least 5 m away. The filter then switches to that pose. Scattered
      rejections, such as noisy daylight matches, never revoke.
    - On 16 held-out mid-lap starts it locks in 0.0–8.0 s, and all 16 end correct. The one aliased lock
-     (13.6 m off) switches to the right pose after 0.3 s (EXP-0036..0038). Strict lap scores are identical to
+     (13.6 m off) switches to the right pose after 0.3 s (EXP-0036..0039). Strict lap scores are identical to
      starting from the true pose.
 5. **Track model.**
    - The surveyed borders give the track and pit-lane centrelines, with (s, n) projection that respects heading.

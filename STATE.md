@@ -25,10 +25,10 @@ Deadline: see `COMPETITION.md` (TODO(<owner>)). Time remaining: TODO(<owner>)
 
 ## Next intended step
 1. OWNER, before 2026-10-18 23:59 CEST (COMPETITION.md): make the repo PUBLIC; submit the form (<= 6 slides PDF, <= 5 min video, trajectory plot `docs/traj_lap*_heldout.png`, team members).
-2. Devin: re-run the organisers' sample on the TASK K commit (guard: if not validated by 18:30 UTC, ship with the revoke disabled, PROV_REVOKE=0).
+2. Devin: re-run the organisers' sample on the TASK L commit (guard: if not validated by 18:30 UTC, ship with the revoke disabled, PROV_REVOKE=0).
 
 ## Latest experiment
-EXP-0038: evidence-based revoke and switch; strict 0.513 / 0.303 / 95.1 %; 16/16 starts end correct.
+EXP-0039: pair-free 3-frame provisional lock restored (daylight sample fix); strict 0.513 / 0.303 / 95.1 %; 16/16 starts end correct.
 
 ## Work claims
 | Surface / task | Claimed by | Since (with timezone) | IDs |
