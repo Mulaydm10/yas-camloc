@@ -60,6 +60,13 @@ ul{list-style:none}
 ul li{position:relative;padding-left:26px;margin:8px 0}
 ul li:before{content:"";position:absolute;left:0;top:15px;width:10px;height:10px;border:2px solid var(--accent);border-radius:2px}
 img{display:block}
+.an{padding:18px 22px;font-size:22px;line-height:1.35;color:var(--ink2);background:var(--surface)}
+.an b{color:var(--ink);font-weight:600}
+.blk{font-size:21px}
+table.why{font:400 21px/1.35 "Source Serif 4",serif}
+table.why td{padding:15px 14px;vertical-align:top;color:var(--ink2)}
+table.why td b{color:var(--ink)}
+table.why .tag{font-size:16px}
 </style>
 </head>
 <body>
@@ -77,9 +84,9 @@ img{display:block}
    <div class="card kpi hero"><div class="label">Position RMSE</div><div class="big">0.51<small>m</small></div></div>
    <div class="card kpi"><div class="label">Lateral RMSE</div><div class="big">0.30<small>m</small></div></div>
    <div class="card kpi"><div class="label">Heading RMSE</div><div class="big">0.31<small>°</small></div></div>
-   <div class="card kpi"><div class="label">Poses within 1 m</div><div class="big">95.1<small>%</small></div></div>
-   <div class="card kpi"><div class="label">1-s intervals with a pose</div><div class="big">99.8<small>%</small></div></div>
-   <div class="card kpi"><div class="label">Time per frame · Apple M4 CPU</div><div class="big">24–39<small>ms / 100</small></div></div>
+   <div class="card kpi"><div class="label">Poses within 1 m · scored metric</div><div class="big">95.1<small>%</small></div></div>
+   <div class="card kpi"><div class="label">1-s intervals with a pose · 90 % needed</div><div class="big">99.8<small>%</small></div></div>
+   <div class="card kpi"><div class="label">Time per frame · M4 CPU · 100 ms budget</div><div class="big">24–39<small>ms</small></div></div>
   </div>
   <div style="display:flex;gap:14px;margin-top:34px"><span class="pill blue">classical · explainable</span><span class="pill">causal</span><span class="pill">CPU only</span><span class="pill">no pre-trained models</span><span class="pill">no external data</span><span class="pill">no start pose</span></div>
  </div>
@@ -109,39 +116,59 @@ img{display:block}
  <div class="scope"><b>Scope:</b> training run, 1195 s, night. Odometry: calibrated wheel speeds + steering (bicycle model), started from the GT pose (display only). Ground truth is drawn for display only. Camera images are not shown (dataset licence: no redistribution).</div>
 </section>
 
-<!-- 3 PIPELINE -->
+<!-- 3 ANALOGY + PIPELINE -->
 <section class="slide">
- <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Pipeline</span><span class="r">Sheet 3 / 6</span></div>
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>The idea</span><span class="r">Sheet 3 / 6</span></div>
  <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
  <div class="frame">
-  <div class="eyebrow">Pipeline · causal, every frame</div>
-  <h2>A known map, odometry and one filter. <em>No neural networks.</em></h2>
-  <div class="flow" style="margin-top:56px;height:330px">
-   <div class="node" style="width:220px"><span class="label">Input</span>Causal MCAP replay: images grouped by stamp, never ahead of time</div><div class="arrow"></div>
-   <div style="display:flex;flex-direction:column;gap:14px;width:330px">
-    <div class="node"><span class="label">Predict</span>Wheel speeds + steering, braking-aware axle choice <span class="mono" style="font-size:15px">(or validation/twist)</span></div>
-    <div class="node"><span class="label">Relative yaw</span>Keyframe rotation: LK flow + essential matrix</div>
-   </div><div class="arrow"></div>
-   <div class="node acc" style="width:300px"><span class="label">Absolute fix</span>CLAHE ORB features → geo-referenced 3D map → PnP + RANSAC per camera, weighted by inliers and reprojection error</div><div class="arrow"></div>
-   <div class="node" style="width:250px"><span class="label">Gate</span>Cross-camera consensus, then a NIS test that recovers if the filter itself is wrong</div><div class="arrow"></div>
-   <div class="node" style="width:290px;border-color:var(--ink);background:var(--ink);color:#F9F6EE"><span class="label" style="color:#B9B19E">EKF</span>x, y, yaw, keyframe yaw, online sideslip · track and pit-lane geometry</div>
-  </div>
-  <div class="card" style="margin-top:56px;display:flex;gap:26px;align-items:center;padding:34px 30px">
-   <div style="width:300px"><div class="label">No start pose</div><h2 style="font-size:40px;margin-top:6px">Find yourself, <em>then check</em>.</h2></div>
-   <div class="flow" style="flex:1">
-    <div class="node" style="flex:1">Global search: descriptor votes over the whole map → PnP on the top 8</div><div class="arrow"></div>
-    <div class="node acc" style="flex:1.1">Provisional lock: 2 cameras agree, or 3 frames agree after odometry</div><div class="arrow"></div>
-    <div class="node" style="flex:1.1">Confirm after 2 accepted fixes, or switch when ≥ 3 rejected fixes agree elsewhere</div><div class="arrow"></div>
-    <div class="node" style="flex:1">Time-boxed search; never silent after 3 s</div>
-   </div>
+  <div class="eyebrow">The guiding analogy</div>
+  <h2>A rally <em>co-driver</em> with a pace-note book.</h2>
+  <div style="display:grid;grid-template-columns:420px 60px 1fr;row-gap:16px;margin-top:30px;align-items:stretch">
+   <div class="label" style="padding-left:4px">The co-driver…</div><div></div><div class="label">…is this block in camloc (causal, every frame)</div>
+
+   <div class="card an"><b>Counts distance and turns</b> from the car's own speed and steering between landmarks. Smooth, but it drifts.</div>
+   <div class="arrow" style="width:44px;justify-self:center"></div>
+   <div class="node blk"><span class="label">Odometry + relative yaw</span>Wheel speeds + steering with a braking-aware axle choice (or validation/twist); keyframe rotation from LK flow + essential matrix.</div>
+
+   <div class="card an"><b>Recognises a landmark</b> from the pace notes and snaps back to the map. Absolute, but only now and then.</div>
+   <div class="arrow" style="width:44px;justify-self:center"></div>
+   <div class="node blk acc"><span class="label">Geo-referenced map + PnP</span>CLAHE ORB features matched to a 3D map built from training laps; PnP + RANSAC per camera gives an absolute fix in metres.</div>
+
+   <div class="card an"><b>Judges each sighting:</b> do two eyes agree, and does it fit where we should be? Look-alikes are rejected.</div>
+   <div class="arrow" style="width:44px;justify-self:center"></div>
+   <div class="node blk"><span class="label">Consensus + NIS gate + EKF</span>Cross-camera agreement, a statistical consistency test that can recover, and an EKF (x, y, yaw, sideslip) on track and pit geometry.</div>
+
+   <div class="card an"><b>Dropped mid-stage with no position:</b> looks around until sightings agree, commits provisionally, and changes their mind if the evidence says so.</div>
+   <div class="arrow" style="width:44px;justify-self:center"></div>
+   <div class="node blk" style="border-color:var(--ink);background:var(--ink);color:#F9F6EE"><span class="label" style="color:#B9B19E">No start pose</span>Global search over the map → provisional lock (2 cameras or 3 frames agree) → confirm after 2 accepted fixes, or switch when ≥ 3 rejected fixes agree elsewhere.</div>
   </div>
  </div>
- <div class="scope"><b>Declarations:</b> no pre-trained models, no external data. OpenCV ORB / LK / PnP only. Car signals used: wheel speeds, steering, brake pressure (allowed set, ADR-0003). The GT pose and <span class="mono">/tf map→base_link</span> are never read at inference; GT is used only for training-time calibration, the map and scoring.</div>
+ <div class="scope"><b>Declarations:</b> no pre-trained models, no external data; OpenCV ORB / LK / PnP only. Car signals: wheel speeds, steering, brake (allowed set, ADR-0003). The GT pose and <span class="mono">/tf map→base_link</span> are never read at inference.</div>
 </section>
 
-<!-- 4 RESULTS -->
+<!-- 4 METHODOLOGY -->
 <section class="slide">
- <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Results</span><span class="r">Sheet 4 / 6</span></div>
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Methodology</span><span class="r">Sheet 4 / 6</span></div>
+ <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+ <div class="frame">
+  <div class="eyebrow">Why each choice · and the evidence</div>
+  <h2>Every block earns its place <em>with a measurement</em>.</h2>
+  <table class="why" style="margin-top:26px">
+   <tr><th style="width:330px">Choice</th><th>Why</th><th style="width:560px">Evidence</th></tr>
+   <tr><td><b>Classical, not deep learning or VLMs</b></td><td>One night of data, so nothing to overfit; explainable; deterministic; real-time on a CPU</td><td><span class="tag ok">24–39 ms</span> per frame on an M4, against a 100 ms frame budget</td></tr>
+   <tr><td><b>Geo-referenced map + PnP</b></td><td>Known 3D geometry gives absolute metres, not just relative motion</td><td>Map fixes take the error from <span class="tag crit">107 m</span> (odometry alone) to under 1 m</td></tr>
+   <tr><td><b>Odometry + EKF</b></td><td>Smooth, causal, and it fills the gaps between fixes</td><td>30 s without any map fix: <span class="tag warn">2.7 m</span>, and it recovers when fixes return</td></tr>
+   <tr><td><b>Gating + consensus</b></td><td>A wrong landmark is worse than none: reject outliers before they reach the filter</td><td>2 % of fixes injected 10 m wrong: lap 4 <span class="tag ok">0.457 m</span> vs 0.460 m clean</td></tr>
+   <tr><td><b>Provisional lock</b></td><td>Commit early so the output is never silent, but never trust a single sighting</td><td><span class="tag ok">16 / 16</span> mid-lap starts end correct; a 13.6 m alias switches in 0.3 s</td></tr>
+   <tr><td><b>Strict validation</b></td><td>The reason these numbers can be trusted: map and every calibration rebuilt without the scored lap; the official scorer; causal replay</td><td>Same <span class="tag ok">0.513 m</span> with or without a GT start pose; calibration leakage measured at ~0.02 m</td></tr>
+  </table>
+ </div>
+ <div class="scope"><b>Scope:</b> night training run with held-out laps 2 / 4 / 6 (strict); wrong-fix and blackout tests on lap 4; odometry baseline over the whole run from the GT start pose (display only). Experiment IDs: EXP-0001, 0017, 0019, 0035, 0036–0039.</div>
+</section>
+
+<!-- 5 RESULTS -->
+<section class="slide">
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Results</span><span class="r">Sheet 5 / 6</span></div>
  <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
  <div class="frame">
   <div class="eyebrow">Results · held-out laps</div>
@@ -164,59 +191,36 @@ img{display:block}
  <div class="scope"><b>Scope:</b> night training run, laps 2 / 4 / 6 each held out: the map and every calibration are rebuilt without the scored lap (strict). The progression points before the last one exclude only the scored lap from the map. Mid-lap starts: 40 s windows at 10–90 % of each held-out lap.</div>
 </section>
 
-<!-- 5 ROBUSTNESS AND LIMITS -->
+<!-- 6 LIMITS + RUN -->
 <section class="slide">
- <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Robustness and limits</span><span class="r">Sheet 5 / 6</span></div>
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Limits and reproducibility</span><span class="r">Sheet 6 / 6</span></div>
  <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
  <div class="frame">
-  <div class="eyebrow">Robustness · honest limits</div>
-  <h2>What we tested, and <em>where it breaks</em>.</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:44px">
-   <div class="card" style="padding:36px 40px"><div class="label" style="margin-bottom:16px;font-size:16px">Stress tests</div>
-    <table style="font-size:27px">
-     <tr><td style="padding:16px 14px">2 % of map fixes shifted 10 m</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.457 m</span></td></tr>
-     <tr><td style="padding:16px 14px">Twist-only input (test layout)</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.602 m</span></td></tr>
-     <tr><td style="padding:16px 14px">Measured front exposure</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">0.5–1 ms</span></td></tr>
-     <tr><td style="padding:16px 14px">Motion blur up to ~60 m/s</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">small</span></td></tr>
-     <tr><td style="padding:16px 14px">Mid-lap starts ending correct</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag ok">16 / 16</span></td></tr>
+  <div class="eyebrow">Engineering maturity</div>
+  <h2>We know exactly <em>where it degrades</em>, and by how much.</h2>
+  <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:26px;margin-top:28px">
+   <div class="card" style="padding:26px 32px"><div class="label" style="margin-bottom:10px">Measured limits</div>
+    <table style="font-size:26px">
+     <tr><td style="padding:17px 14px">30 s / 60 s without map fixes</td><td class="n"><span class="tag warn">2.7 m</span> <span class="tag crit">5.2 m</span></td></tr>
+     <tr><td style="padding:17px 14px">Aliased start: time to correct</td><td class="n"><span class="tag warn">0.3–11 s</span></td></tr>
+     <tr><td style="padding:17px 14px">Daylight sample: accepted fixes</td><td class="n"><span class="tag warn">11 in 74 s</span></td></tr>
+     <tr><td style="padding:17px 14px">Lateral from paint (0.2 m height)</td><td class="n"><span class="tag crit">unobservable</span></td></tr>
+     <tr><td style="padding:17px 14px">Front exposure (blur small to ~60 m/s)</td><td class="n"><span class="tag ok">0.5–1 ms</span></td></tr>
     </table>
-    <p style="font-size:22px;margin-top:22px">Wrong-fix test: lap 4. Twist: pooled held-out laps. Blur at 60 m/s is extrapolated from the measured exposure.</p></div>
-   <div class="card" style="padding:36px 40px"><div class="label" style="margin-bottom:16px;font-size:16px">Limits</div>
-    <table style="font-size:27px">
-     <tr><td style="padding:16px 14px">30 s without map fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">2.7 m</span></td></tr>
-     <tr><td style="padding:16px 14px">60 s without map fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag crit">5.2 m</span></td></tr>
-     <tr><td style="padding:16px 14px">Aliased start: time to correct</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">0.3–11 s</span></td></tr>
-     <tr><td style="padding:16px 14px">Daylight sample: accepted fixes</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag warn">11 in 74 s</span></td></tr>
-     <tr><td style="padding:16px 14px">Lateral from paint (0.2 m height)</td><td class="n"><span style="font-size:22px;padding:5px 14px" class="tag crit">unobservable</span></td></tr>
-    </table>
-    <p style="font-size:22px;margin-top:22px">Blackouts: lap 4, RMSE over the window. The daylight sample has no GT: a structural check only (locks at 0.6 s, 74 / 74 one-second bins). Daylight against a night map means sparse fixes, so more dead reckoning.</p></div>
+    <p style="font-size:21px;margin-top:18px">Blackouts: lap 4. The daylight sample has no GT: a structural check only (locks at 0.6 s, 74 / 74 one-second bins). Blur at 60 m/s is extrapolated.</p></div>
+   <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card" style="background:var(--ink);border-color:var(--ink);padding:28px 32px">
+     <div class="mono" style="font-size:36px;color:#F9F6EE">$ ./run.sh test.mcap out.csv</div>
+     <div class="mono" style="font-size:17px;color:#B9B19E;margin-top:12px">No flags. Both topic layouts. Builds the venv and the visual map on first use.</div></div>
+    <div class="card" style="padding:30px 32px"><ul style="columns:2;column-gap:30px">
+     <li style="font-size:27px;margin:14px 0">Strict leave-one-lap-out</li><li style="font-size:27px;margin:14px 0">Causal, image stamps only</li><li style="font-size:27px;margin:14px 0">GT pose never read</li><li style="font-size:27px;margin:14px 0">26 automated tests</li>
+     <li style="font-size:27px;margin:14px 0">Python 3.10–3.12, CPU</li><li style="font-size:27px;margin:14px 0">39 logged experiments</li></ul></div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap"><span class="pill blue" style="font-size:20px;padding:10px 20px">github.com/Mulaydm10/yas-camloc</span>
+     <span class="pill" style="font-size:20px;padding:10px 20px">TEAM: &lt;names — owner fills in&gt;</span></div>
+   </div>
   </div>
  </div>
- <div class="scope"><b>Scope:</b> all numbers from the night training run with held-out laps, except the organisers' daylight sample (structural check, no ground truth, never used for tuning). Experiments EXP-0030–0039 in <span class="mono">experiments/experiment_log.md</span>.</div>
-</section>
-
-<!-- 6 REPRODUCIBILITY -->
-<section class="slide">
- <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Reproducibility and rules</span><span class="r">Sheet 6 / 6</span></div>
- <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
- <div class="frame">
-  <div class="eyebrow">Run it</div>
-  <h2>One command, <em>both topic layouts</em>.</h2>
-  <div class="card" style="margin-top:30px;background:var(--ink);border-color:var(--ink);padding:44px 48px">
-   <div class="mono" style="font-size:44px;color:#F9F6EE">$ ./run.sh test.mcap out.csv</div>
-   <div class="mono" style="font-size:19px;color:#B9B19E;margin-top:12px">→ out.csv (timestamp_ns, x, y, yaw) + out.run.json (per-frame time, hardware). Builds the venv and the visual map on first use.</div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px">
-   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Validation</div><ul><li>Strict leave-one-lap-out: map + calibration</li><li>Causal processing, image stamps only</li><li>GT pose never read at inference</li></ul></div>
-   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Engineering</div><ul><li>26 automated tests</li><li>Python 3.10–3.12, CPU only</li><li>Training and test-domain layouts</li></ul></div>
-   <div class="card" style="padding:30px 34px"><div class="label" style="font-size:16px;margin-bottom:8px">Traceable</div><ul><li>39 logged experiments (EXP-####)</li><li>Decisions as ADRs</li><li>Independent reviewer loop</li></ul></div>
-  </div>
-  <div style="display:flex;gap:22px;margin-top:48px;align-items:center">
-   <span class="pill blue" style="font-size:24px;padding:12px 24px">github.com/Mulaydm10/yas-camloc</span>
-   <span class="pill" style="font-size:24px;padding:12px 24px">TEAM: &lt;names — owner fills in&gt;</span>
-  </div>
- </div>
- <div class="scope"><b>Scope:</b> <span class="mono">run.sh</span> with no flags was checked on the full training run and on a 60 s test-domain cut (no state_estimation, /tf or track_bounds; speed and yaw rate from validation/twist).</div>
+ <div class="scope"><b>Scope:</b> night training run with held-out laps, except the organisers' daylight sample (structural check, no ground truth, never used for tuning). <span class="mono">run.sh</span> with no flags was checked on the full training run and on a 60 s test-domain cut.</div>
 </section>
 
 </body>
