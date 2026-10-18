@@ -22,8 +22,17 @@ TRAIN=${TRAIN:-$PWD/data/c0_2026-10-13_22-53-42_camloc/c0_2026-10-13_22-53-42_ca
 [ -d "$TEST" ] && TEST=$(ls "$TEST"/*.mcap | head -1)
 
 if [ ! -x .venv/bin/python ]; then
-  if command -v uv >/dev/null; then uv venv -q --python 3.12 .venv && uv pip install -q --python .venv/bin/python -r requirements.txt
-  else python3.12 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; fi
+  if command -v uv >/dev/null; then
+    uv venv -q --python 3.12 .venv && uv pip install -q --python .venv/bin/python -r requirements.txt
+  else                                   # any Python >= 3.10 (3.12 preferred)
+    PYB=""
+    for c in python3.12 python3.11 python3.10 python3; do
+      if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then PYB=$c; break; fi
+    done
+    [ -n "$PYB" ] || { echo "run.sh: need Python >= 3.10 (or uv) to create .venv" >&2; exit 1; }
+    "$PYB" -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -r requirements.txt
+  fi
+  [ -x .venv/bin/python ] || { echo "run.sh: creating .venv failed" >&2; exit 1; }
 fi
 PY=.venv/bin/python
 if [ ! -f camloc/assets/track_bounds.npz ]; then   # for test files without a track_bounds topic (TASK I.0)

@@ -11,7 +11,7 @@ Every other doc **links here** instead of restating a date, weight or rule. A du
 | Event link | TODO(<owner>) |
 | Theme / track | Camera-based localization on a race track (Yas Marina Circuit) |
 | Start | 2026-10-16 (opening). Brief: "16-21 of October 2026 (16 – opening, 17-18 – work, 19-20 – evaluation, 21 - closing)". Time and timezone: not stated, TODO(<owner>) |
-| **Submission deadline** | Work days are 2026-10-17 and 2026-10-18, so the last work day is **2026-10-18**. Exact upload time and **timezone** are not stated: TODO(<owner>) (Q-0002) |
+| **Submission deadline** | **2026-10-18 23:59 CEST (21:59 UTC)**: organisers via Discord #camera-localization, relayed by Devin on GitHub #2 (TASK I, 2026-10-18 14:25 UTC). Submission form: https://forms.cloud.microsoft/r/Cu6YHzCwdZ (max 6 slides as PDF, video max 5 min, trajectory visualisation, all team members). The repo must be **public** at submission ("private repo = disqualification"). |
 | Demo / judging time | Evaluation 2026-10-19 to 2026-10-20; closing 2026-10-21. Times / timezone: TODO(<owner>) |
 | Submission format | Pose CSV for the hidden test run (`timestamp_ns, x [m], y [m], yaw [rad]`, track frame, stamp = image header stamp); full source code (Git link or archive) with a run script; validation results (scoring-script output); presentation (max. 5 min, max. 6 slides); trajectory-vs-GT video or plot. Upload channel / form: TODO(<owner>) |
 | Team size limit | TODO(<owner>) |
@@ -42,7 +42,7 @@ Quantitative total 70 %, qualitative 30 %. Each quantitative metric is normalise
 | Licensing / open-source requirement | Dataset: for use in the National AI Hackathon 2026 only; no redistribution or commercial use without written permission from Constructor Labs. Code licence: TODO(<owner>) |
 | API-key and rate-limit constraints | TODO(<owner>) |
 | Rules on AI-generated code | TODO(<owner>) |
-| Allowed/forbidden tools, datasets, models | Inputs: camera images, camera calibration, track borders; car state data (accelerations, speed and other fields) may be used. No LiDAR or radar. Ground truth only for training/validation, never at inference except the first pose of the run. Pre-trained models and public external datasets allowed but must be declared. |
+| Allowed/forbidden tools, datasets, models | Inputs: camera images, camera calibration, track borders; car state data (accelerations, speed and other fields) may be used; organisers (Discord, 18 Oct): speed, accelerations and yaw rate from state_estimation may be used, pose fields may not, and **no starting pose is given**. The organisers' test-domain sample may NOT be used to train, tune or validate. No LiDAR or radar. Ground truth only for training/validation, never at inference except the first pose of the run. Pre-trained models and public external datasets allowed but must be declared. |
 | Causality | Causal (online) only: the estimate for frame t uses data up to t. Offline/smoothed results may be shown but are not ranked. |
 | Output rate and coverage | Poses at camera rate (10 Hz expected); at least 90 % of 1 s intervals must have a pose, or the run is not ranked. |
 | Reproducibility | Repository with README, dependency list and a single run script from the raw dataset; must run on a single-GPU workstation; organisers may re-run it. Measured average time per frame reported with the hardware. |

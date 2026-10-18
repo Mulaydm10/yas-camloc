@@ -343,7 +343,7 @@ def test_global_init_without_any_ground_truth_pose(tmp_path, monkeypatch):
     stats = R.run(C.DEFAULT_MCAP, tmp_path / 'gi.csv', 'vismap', start_s=640, duration_s=3)
     assert stats['estimator_stats']['global_init_locks'] == 1
     assert stats['estimator_stats']['global_init_lock_t_s'] < 2.0
-    assert stats['poses'] == stats['frames']
+    assert stats['poses'] >= stats['frames'] - 20      # no pose is emitted before the lock (TASK I)
 
 
 def test_twist_odometry_uses_velocity_and_sideslip():

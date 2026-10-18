@@ -208,7 +208,8 @@ class VisualHeading(OdomBounds):
     def priors_active(self, t_ns):
         return True
 
-    BOUNDS_CORNERS = 0       # TASK H.2: also apply the lateral track bound in corners when priors are active
+    BOUNDS_CORNERS = 1       # also apply the lateral track bound in corners during fix droughts (EXP-0033: neutral on
+                             # strict folds; keeps the car on the track polygon in long droughts, TASK I.0)
 
     PIT_SPEED = 12.0        # m/s; the training run drives the pit lane at a limiter-like 8 m/s, the track at 20-40
     PIT_HOLD_S = 2.0
@@ -292,10 +293,11 @@ class VisualMapLoc(VisualHeading):
     # A pose is locked only on consensus: two cameras within GI_AGREE_M / GI_AGREE_DEG in one frame, or the best
     # hypothesis of GI_FRAMES consecutive frames agreeing after odometry propagation; it must lie on a lane.
     GI_AGREE_M, GI_AGREE_DEG, GI_FRAMES, GI_LANE_MARGIN = 2.0, 5.0, 3, 2.0
-    REINIT_S, REINIT_EVERY = 15.0, 5     # no accepted fix for this long -> global search every N frames (0 = off)
+    GI_EMIT_HYP = 0                      # 1 = emit the best single hypothesis before the lock
+    REINIT_S, REINIT_EVERY = 15.0, 10     # no accepted fix for this long -> global search every N frames (0 = off)
 
-    def _global_hyps(self, gray):
-        cams = [c for c in self.MAP_CAMS if c in gray]
+    def _global_hyps(self, gray, cams=None):
+        cams = [c for c in (cams or self.MAP_CAMS) if c in gray]
         res = self.pool.map(lambda c: self._seeded(self.loc.global_localize, c, gray[c]), cams)
         hyps = []
         for r in (h for hs in res for h in hs):
@@ -354,10 +356,12 @@ class VisualMapLoc(VisualHeading):
             if lock is not None:
                 self._lock(lock, fs.stamp_ns, reinit=False)
                 return self.ekf.pose
-            if hyps:                                  # before the lock: best current hypothesis keeps coverage
+            # before the lock: emit NO pose. A wrong guess costs far more RMSE than a missing frame (coverage counts
+            # 1-s bins, and the lock usually comes within 0.1 s); the GI_EMIT_HYP option emits the best hypothesis
+            if self.GI_EMIT_HYP and hyps:
                 b = max(hyps, key=lambda h: h['n'])
-                self._gi_out = (b['x'], b['y'], b['yaw'])
-            return self._gi_out if self._gi_out is not None else self.ekf.pose
+                return (b['x'], b['y'], b['yaw'])
+            return None
         gray = self._gray(fs)
         cams = [c for c in self.MAP_CAMS if c in gray]
         feats = {c: self.pool.submit(self.loc.features, c, gray[c]) for c in cams}   # overlaps the heading step
@@ -437,7 +441,9 @@ class VisualMapLoc(VisualHeading):
             self._log_fixes(fs.stamp_ns, x, y, yaw, res, fixes, used0, use, nis)
         if (self.REINIT_S and self.last_fix_t is not None and (fs.stamp_ns - self.last_fix_t) / 1e9 > self.REINIT_S
                 and self._nframe % self.REINIT_EVERY == 0):
-            lock = self._try_lock(self._global_hyps(gray), fs.stamp_ns)
+            # time-boxed: ONE camera per attempt (round robin), so a long drought costs ~1/REINIT_EVERY of a search
+            self._rr = (getattr(self, '_rr', -1) + 1) % len(self.MAP_CAMS)
+            lock = self._try_lock(self._global_hyps(gray, [self.MAP_CAMS[self._rr]]), fs.stamp_ns)
             if lock is not None:
                 self._lock(lock, fs.stamp_ns, reinit=True)
         if self.STATE_LOG:                    # DIAGNOSTIC: learned online states per frame (k, slip b, c)
