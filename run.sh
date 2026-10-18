@@ -26,6 +26,9 @@ if [ ! -x .venv/bin/python ]; then
   else python3.12 -m venv .venv && .venv/bin/pip install -q -r requirements.txt; fi
 fi
 PY=.venv/bin/python
+if [ ! -f camloc/assets/track_bounds.npz ]; then   # for test files without a track_bounds topic (TASK I.0)
+  CAMLOC_MCAP="$TRAIN" $PY -W ignore -m camloc.tools.export_bounds
+fi
 if [ ! -f camloc/assets/vmap.npz ]; then
   echo "building the visual map from the training bag ($TRAIN) ..."
   CAMLOC_MCAP="$TRAIN" $PY -W ignore -m camloc.tools.build_map --norm --out camloc/assets/vmap.npz

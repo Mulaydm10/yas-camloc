@@ -106,17 +106,24 @@ class Replay:
         self.has_state = None
 
     def __iter__(self):
-        topics = [C.IMG_TOPIC.format(c) for c in self.cams]
-        cam_of = {C.IMG_TOPIC.format(c): c for c in self.cams}
         merger = CausalMerger(self.lag_ns)
         self._held = []
         with open(self.path, 'rb') as f:
             r = _reader(f)
             summ = r.get_summary()
             all_topics = {ch.topic for ch in summ.channels.values()}
-            self.has_state = C.STATE_TOPIC in all_topics and bool(self.fields)
+            cam_of = {resolve_topic(all_topics, C.IMG_TOPIC.format(c)): c for c in self.cams}
+            cam_of.pop(None, None)
+            topics = list(cam_of)
+            state_topic = resolve_topic(all_topics, C.STATE_TOPIC)
+            twist_topic = resolve_topic(all_topics, C.TWIST_TOPIC)
+            self.has_state = state_topic is not None and bool(self.fields)
+            self.state_source = 'state_estimation' if self.has_state else None
             if self.has_state:
-                topics.append(C.STATE_TOPIC)
+                topics.append(state_topic)
+            elif twist_topic is not None and self.fields:      # TASK I.0: speed + yaw rate from validation/twist
+                topics.append(twist_topic)
+                self.has_state, self.state_source = True, 'twist'
             t_first = summ.statistics.message_start_time
             start = t_first + int(self.start_s * 1e9)
             end = None if self.duration_s is None else start + int(self.duration_s * 1e9)
@@ -124,12 +131,16 @@ class Replay:
             from mcap_ros2.decoder import DecoderFactory
             decoders, factory = {}, DecoderFactory()
             for sch, ch, m in r.iter_messages(topics=topics, start_time=start, end_time=end, log_time_order=True):
-                if ch.topic == C.STATE_TOPIC:
+                if ch.topic == state_topic or ch.topic == twist_topic:
                     if ch.id not in decoders:
                         decoders[ch.id] = factory.decoder_for(ch.message_encoding, sch)
                     msg = decoders[ch.id](m.data)
                     st = _stamp(msg.header)
-                    item = ('state', {k: float(getattr(msg, k)) for k in self.fields})
+                    if ch.topic == state_topic:
+                        item = ('state', {k: float(getattr(msg, k)) for k in self.fields})
+                    else:
+                        tw = msg.twist
+                        item = ('state', dict(zip(C.TWIST_FIELDS, (float(tw.linear.x), float(tw.linear.y), float(tw.angular.z)))))
                 else:
                     st, jpg = _cdr_image(m.data)
                     item = ('img', cam_of[ch.topic], jpg)
@@ -191,36 +202,69 @@ class Camera:
     T_base_cam: np.ndarray   # 4x4, maps camera-optical-frame points into base_link
 
 
+def resolve_topic(all_topics, canonical):
+    """The canonical topic if present, else the unique topic with the same last two path components."""
+    if canonical in all_topics:
+        return canonical
+    tail = '/'.join(canonical.split('/')[-2:])
+    hits = [t for t in all_topics if t.endswith('/' + tail) or t == tail]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _topics(mcap_path):
+    with open(mcap_path, 'rb') as f:
+        return {ch.topic for ch in _reader(f).get_summary().channels.values()}
+
+
+BOUNDS_ASSET = 'track_bounds.npz'      # exported from the TRAINING bag by tools/export_bounds.py (git-ignored)
+
+
+def _bounds_asset(dim):
+    path = C.ASSETS / BOUNDS_ASSET
+    if not path.exists():
+        raise RuntimeError(f'no track_bounds topic in the input and no {path} (run tools/export_bounds.py on the training bag)')
+    z = np.load(path)
+    return {k[:-3]: z[k][:, :dim] for k in z.files if k.endswith('_3d')}
+
+
 def load_static(mcap_path=C.DEFAULT_MCAP, cams=C.CAMS):
     """Camera calibration and track bounds from the latched topics (first copy of each)."""
     cameras, bounds, extr = {}, {}, {}
-    want_info = {C.INFO_TOPIC.format(c): c for c in cams}
+    tops = _topics(mcap_path)
+    want_info = {resolve_topic(tops, C.INFO_TOPIC.format(c)): c for c in cams}
+    want_info.pop(None, None)
+    bounds_topic = resolve_topic(tops, C.BOUNDS_TOPIC)
     with open(mcap_path, 'rb') as f:
         for _, ch, _, msg in _reader(f).iter_decoded_messages(
-                topics=list(want_info) + [C.TF_STATIC_TOPIC, C.BOUNDS_TOPIC]):
+                topics=list(want_info) + [C.TF_STATIC_TOPIC] + ([bounds_topic] if bounds_topic else [])):
             if ch.topic == C.TF_STATIC_TOPIC and not extr:
                 for t in msg.transforms:
-                    if t.header.frame_id == C.BASE_FRAME:
+                    if t.header.frame_id.split('/')[-1] == C.BASE_FRAME.split('/')[-1]:
                         T = np.eye(4)
                         q, p = t.transform.rotation, t.transform.translation
                         T[:3, :3] = quat_to_R(q.x, q.y, q.z, q.w)
                         T[:3, 3] = (p.x, p.y, p.z)
-                        extr[t.child_frame_id] = T
-            elif ch.topic == C.BOUNDS_TOPIC and not bounds:
+                        extr[t.child_frame_id.split('/')[-1]] = T
+            elif ch.topic == bounds_topic and not bounds:
                 bounds = {mk.ns: np.array([[p.x, p.y] for p in mk.points]) for mk in msg.markers}
             elif ch.topic in want_info and want_info[ch.topic] not in cameras:
                 c = want_info[ch.topic]
                 cameras[c] = (np.array(msg.k).reshape(3, 3), np.array(msg.d), msg.width, msg.height)
-            if extr and bounds and len(cameras) == len(cams):
+            if extr and (bounds or not bounds_topic) and len(cameras) == len(want_info):
                 break
-    cams_out = {c: Camera(c, K, D, w, h, extr[f'constructor0/camera_{c}']) for c, (K, D, w, h) in cameras.items()}
+    if not bounds:                                      # test-domain layout without track_bounds (TASK I.0)
+        bounds = _bounds_asset(2)
+    cams_out = {c: Camera(c, K, D, w, h, extr[f'camera_{c}']) for c, (K, D, w, h) in cameras.items()}
     return cams_out, bounds
 
 
 def load_bounds3d(mcap_path=C.DEFAULT_MCAP):
     """Track and pit-lane borders as (N, 3) map points (x, y, z), from the latched track_bounds topic."""
+    bt = resolve_topic(_topics(mcap_path), C.BOUNDS_TOPIC)
+    if bt is None:
+        return _bounds_asset(3)
     with open(mcap_path, 'rb') as f:
-        for _, _, _, msg in _reader(f).iter_decoded_messages(topics=[C.BOUNDS_TOPIC]):
+        for _, _, _, msg in _reader(f).iter_decoded_messages(topics=[bt]):
             return {mk.ns: np.array([[p.x, p.y, p.z] for p in mk.points]) for mk in msg.markers}
     raise RuntimeError('no track_bounds message')
 

@@ -72,11 +72,16 @@ class OdomEstimator(Estimator):
             if self.SLIP_STATE >= 2:     # Devin's refinement: b + c * a_y
                 slip.update({'c_sigma0': np.radians(self.SLIP_C_SIGMA0_DEG), 'c_q': np.radians(self.SLIP_C_Q_DEG),
                              'c_clip': np.radians(self.SLIP_C_CLIP_DEG)})
-        scale = ({'sigma0': self.SCALE_SIGMA0, 'q': self.SCALE_Q, 'tau': self.SCALE_TAU_S, 'clip': self.SCALE_CLIP}
-                 if self.SCALE_STATE else None)
-        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'], slip=slip, scale=scale)
-        self.ekf.q_lat = self.Q_LAT
+        self._slip_cfg = slip
+        self._scale_cfg = ({'sigma0': self.SCALE_SIGMA0, 'q': self.SCALE_Q, 'tau': self.SCALE_TAU_S, 'clip': self.SCALE_CLIP}
+                           if self.SCALE_STATE else None)
+        self.ekf = self._make_ekf(self.x, self.y, self.yaw)
         self.t = self.t0
+
+    def _make_ekf(self, x, y, yaw, p0=(0.05, 0.05, np.radians(0.5))):
+        ekf = PoseEKF(x, y, yaw, self.odo.p['q'], p0=p0, slip=self._slip_cfg, scale=self._scale_cfg)
+        ekf.q_lat = self.Q_LAT
+        return ekf
 
     def _advance(self, t_ns):
         if self.t == 0:                      # --init without a stamp: start the clock at the first event
@@ -85,6 +90,7 @@ class OdomEstimator(Estimator):
         if t_ns > self.t:
             p = self.odo.p
             beta = self.BETA0_GAIN * p.get('beta0', 0.0) + self.BETA1_GAIN * p.get('beta1', 0.0) * self.odo.v * self.odo.wz
+            beta += self.odo.beta_meas                                   # measured sideslip (twist input)
             self.ekf.predict((t_ns - self.t) / 1e9, self.odo.v, self.odo.wz, float(np.clip(beta, -0.07, 0.07)))
             self.t = t_ns
 
@@ -274,12 +280,84 @@ class VisualMapLoc(VisualHeading):
         self.n_reject = 0
         self.n_cons_reject = 0
         self.t0_stress = None
+        self.need_init = False            # TASK I: set by run() when the run gives no starting pose
+        self._gi_hist, self._gi_out, self._nframe = [], None, 0
+        self.stats.update({'global_init_locks': 0, 'global_init_lock_t_s': None, 'reinit_locks': 0})
 
     @property
     def DECODE_CAMS(self):
         return tuple(dict.fromkeys(self.VIS_CAMS + self.MAP_CAMS))
 
+    # TASK I (EXP-0036): global initialisation with no starting pose, and re-localisation after a long loss.
+    # A pose is locked only on consensus: two cameras within GI_AGREE_M / GI_AGREE_DEG in one frame, or the best
+    # hypothesis of GI_FRAMES consecutive frames agreeing after odometry propagation; it must lie on a lane.
+    GI_AGREE_M, GI_AGREE_DEG, GI_FRAMES, GI_LANE_MARGIN = 2.0, 5.0, 3, 2.0
+    REINIT_S, REINIT_EVERY = 15.0, 5     # no accepted fix for this long -> global search every N frames (0 = off)
+
+    def _global_hyps(self, gray):
+        cams = [c for c in self.MAP_CAMS if c in gray]
+        res = self.pool.map(lambda c: self._seeded(self.loc.global_localize, c, gray[c]), cams)
+        hyps = []
+        for r in (h for hs in res for h in hs):
+            lane, s_, n_ = self.track.locate(r['x'], r['y'], r['yaw'])[:3]
+            if self.track.lanes[str(lane[0])].inside(s_, n_, self.GI_LANE_MARGIN)[0]:
+                hyps.append(r)
+        return hyps
+
+    def _try_lock(self, hyps, t):
+        """Consensus lock from this frame's hypotheses and the recent history (propagated by odometry)."""
+        ex, ey, eh = self.ekf.X[:3]                   # odometry-propagated frame of reference
+        agree = lambda a, b: (np.hypot(a[0] - b[0], a[1] - b[1]) < self.GI_AGREE_M
+                              and abs(np.angle(np.exp(1j * (a[2] - b[2])))) < np.radians(self.GI_AGREE_DEG))
+        for i in range(len(hyps)):                    # two cameras agreeing in the same frame
+            for j in range(i + 1, len(hyps)):
+                a, b = hyps[i], hyps[j]
+                if a['cam'] != b['cam'] and agree((a['x'], a['y'], a['yaw']), (b['x'], b['y'], b['yaw'])):
+                    w = np.array([a['n'], b['n']], float)
+                    return (float(np.average([a['x'], b['x']], weights=w)), float(np.average([a['y'], b['y']], weights=w)),
+                            float(np.angle(w[0] * np.exp(1j * a['yaw']) + w[1] * np.exp(1j * b['yaw']))))
+        best = max(hyps, key=lambda h: h['n']) if hyps else None
+        self._gi_hist.append((t, (ex, ey, eh), None if best is None else (best['x'], best['y'], best['yaw'])))
+        self._gi_hist = self._gi_hist[-self.GI_FRAMES:]
+        if best is None or len(self._gi_hist) < self.GI_FRAMES or any(h[2] is None for h in self._gi_hist):
+            return None
+        now = (best['x'], best['y'], best['yaw'])
+        for _, (px, py, ph), hp in self._gi_hist[:-1]:  # propagate each past hypothesis by the odometry motion
+            c, s_ = np.cos(-ph), np.sin(-ph)
+            dx, dy = c * (ex - px) - s_ * (ey - py), s_ * (ex - px) + c * (ey - py)
+            prop = (hp[0] + np.cos(hp[2]) * dx - np.sin(hp[2]) * dy, hp[1] + np.sin(hp[2]) * dx + np.cos(hp[2]) * dy,
+                    hp[2] + (eh - ph))
+            if not agree(prop, now):
+                return None
+        return now
+
+    def _lock(self, pose, t, reinit):
+        x, y, yaw = pose
+        self.ekf = self._make_ekf(x, y, yaw, p0=(1.0, 1.0, np.radians(1.0)))
+        self.lane = str(self.track.locate(x, y, yaw)[0][0])
+        self.kf_t, self.last_fix_t, self.n_reject, self.n_cons_reject = None, t, 0, 0
+        self._trk, self._gi_hist, self.need_init = {}, [], False
+        if reinit:
+            self.stats['reinit_locks'] += 1
+        else:
+            self.stats['global_init_locks'] += 1
+            self.stats['global_init_lock_t_s'] = round((t - self._t_first) / 1e9, 2)
+
     def on_frames(self, fs):
+        self._nframe += 1
+        if self.need_init:                            # no pose yet: odometry runs, cameras search the whole map
+            if not hasattr(self, '_t_first'):
+                self._t_first = fs.stamp_ns
+            self._advance(fs.stamp_ns)
+            hyps = self._global_hyps(self._gray(fs))
+            lock = self._try_lock(hyps, fs.stamp_ns)
+            if lock is not None:
+                self._lock(lock, fs.stamp_ns, reinit=False)
+                return self.ekf.pose
+            if hyps:                                  # before the lock: best current hypothesis keeps coverage
+                b = max(hyps, key=lambda h: h['n'])
+                self._gi_out = (b['x'], b['y'], b['yaw'])
+            return self._gi_out if self._gi_out is not None else self.ekf.pose
         gray = self._gray(fs)
         cams = [c for c in self.MAP_CAMS if c in gray]
         feats = {c: self.pool.submit(self.loc.features, c, gray[c]) for c in cams}   # overlaps the heading step
@@ -357,6 +435,11 @@ class VisualMapLoc(VisualHeading):
         self.stats['map_rejected'] += len(fixes) - len(use)
         if self.FIX_LOG:
             self._log_fixes(fs.stamp_ns, x, y, yaw, res, fixes, used0, use, nis)
+        if (self.REINIT_S and self.last_fix_t is not None and (fs.stamp_ns - self.last_fix_t) / 1e9 > self.REINIT_S
+                and self._nframe % self.REINIT_EVERY == 0):
+            lock = self._try_lock(self._global_hyps(gray), fs.stamp_ns)
+            if lock is not None:
+                self._lock(lock, fs.stamp_ns, reinit=True)
         if self.STATE_LOG:                    # DIAGNOSTIC: learned online states per frame (k, slip b, c)
             if not hasattr(self, '_statelog'):
                 self._statelog = open(self.STATE_LOG, 'w')
@@ -453,16 +536,23 @@ ESTIMATORS = {'hold': HoldEstimator, 'odom': OdomEstimator, 'odom_bounds': OdomB
 NEEDS_AMBIGUOUS = {'odom_est', 'odom_est_bounds', 'vis_est', 'vismap_est'}
 
 
+GLOBAL_INIT = {'vismap', 'vismap_est'}      # estimators that find their own starting pose (TASK I)
+
+
 def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=None, cams=C.CAMS, overrides=None,
-        init=None):
+        init=None, gt_init=False):
     if estimator in NEEDS_AMBIGUOUS and state != 'ambiguous':
         raise SystemExit(f'{estimator} uses fused estimator fields: pass --state ambiguous (rules question Q1)')
     cameras, bounds = load_static(mcap, cams)
     track = TrackModel(bounds)
-    if init is None:
-        init = initial_pose(mcap)                       # first map -> base_link pose of the run (allowed)
-    else:                                               # (x, y, yaw) given explicitly; stamp = first image
+    auto = False
+    if init is not None:                                # (x, y, yaw) given explicitly; stamp = first image
         init = (0, *init)
+    elif estimator in GLOBAL_INIT and not gt_init:      # default: no starting pose is read (the test file has none)
+        x0, y0, h0 = track.track.to_xy(np.array([0.0]), 0.0)
+        init, auto = (0, float(x0[0]), float(y0[0]), float(h0[0])), True
+    else:                                               # VALIDATION / baselines only: first map -> base_link of /tf
+        init = initial_pose(mcap)
     cls = ESTIMATORS[estimator]
     if overrides:                                     # tuning / ablation: estimator class parameters, applied to a
         for k in overrides:                           # subclass BEFORE construction (the EKF is built in __init__)
@@ -470,6 +560,8 @@ def run(mcap, out, estimator='hold', state='allowed', start_s=0.0, duration_s=No
                 raise SystemExit(f'{estimator} has no parameter {k}')
         cls = type(cls.__name__, (cls,), {k: type(getattr(cls, k))(v) for k, v in overrides.items()})
     est = cls(init, cameras, track)
+    if auto:
+        est.need_init = True
     rows, proc = [], []
     rp = Replay(mcap, cams=cams, state=state, start_s=start_s, duration_s=duration_s)
     n_state = 0
@@ -508,13 +600,15 @@ def main(argv=None):
     ap.add_argument('--duration', type=float)
     ap.add_argument('--vmap', help='visual map (.npz); default camloc/assets/vmap.npz')
     ap.add_argument('--set', nargs='*', default=[], metavar='NAME=VALUE', help='override estimator parameters')
-    ap.add_argument('--init', help='initial pose "x,y,yaw" if the test file has no /tf first pose')
+    ap.add_argument('--init', help='initial pose "x,y,yaw" (otherwise vismap finds it itself: global initialisation)')
+    ap.add_argument('--gt-init', action='store_true', help='VALIDATION ONLY: start from the first /tf map->base_link pose')
     a = ap.parse_args(argv)
     if a.vmap:
         VisualMapLoc.VMAP = Path(a.vmap)
     ov = dict(kv.split('=', 1) for kv in a.set)
     init = tuple(float(v) for v in a.init.split(',')) if a.init else None
-    print(json.dumps(run(a.mcap, a.out, a.estimator, a.state, a.start, a.duration, overrides=ov, init=init), indent=1))
+    print(json.dumps(run(a.mcap, a.out, a.estimator, a.state, a.start, a.duration, overrides=ov, init=init,
+                         gt_init=a.gt_init), indent=1))
 
 
 if __name__ == '__main__':

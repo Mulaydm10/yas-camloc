@@ -17,7 +17,14 @@ Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estim
   the dataset, so it is not committed.
 - It then writes `out.csv` (`timestamp_ns,x,y,yaw`) and `out.run.json`, which holds the per-frame processing
   time and the hardware.
-- If the test file has no `/tf` first pose, pass it: `./run.sh test.mcap out.csv -- --init x,y,yaw`.
+- **No starting pose is needed (or read).** The localiser finds its own first pose by matching the cameras
+  against the whole visual map (global initialisation, consensus of two cameras or three frames), and
+  re-localises the same way after more than 15 s without a map fix. `/tf` `map->base_link` is never read at
+  inference (`--gt-init` exists for validation only).
+- **Input layouts:** the training layout (`state_estimation`, `track_bounds`), or the organisers'
+  test-domain layout (no `state_estimation`, `/tf` or `track_bounds`). For the latter, speed, lateral velocity
+  and yaw rate come from `/constructor0/validation/twist`, and the borders come from
+  `camloc/assets/track_bounds.npz`, which `run.sh` exports from the training bag.
 - The fused car-state variant (ADR-0003, not the default) runs with
   `./run.sh test.mcap out.csv -- --estimator vismap_est --state ambiguous`.
 

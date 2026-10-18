@@ -55,8 +55,18 @@ class Odometry:
         self.wz = 0.0
         self.t = None
 
+    beta_meas = 0.0              # measured sideslip (twist sources only): atan2(vy, vx)
+
     def update(self, stamp_ns, f):
         self.t = stamp_ns
+        if 'twist_vx' in f or self.source == 'twist':
+            # TASK I.0: velocity + yaw rate in base_link, from validation/twist (test layout) or, for validation,
+            # the equivalent state_estimation fields of the training run
+            vx, vy, wz = ((f['twist_vx'], f['twist_vy'], f['twist_wz']) if 'twist_vx' in f
+                          else (f['vx_mps'], f['vy_mps'], f['wz_radps']))
+            self.v, self.wz = float(np.hypot(vx, vy)), float(wz)
+            self.beta_meas = float(np.arctan2(vy, vx)) if self.v > 1.0 else 0.0
+            return
         if self.source == 'estimator':
             self.v, self.wz = f['v_mps'], f['wz_radps']
             return

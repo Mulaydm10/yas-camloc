@@ -28,3 +28,4 @@ cache/
 .playwright-mcp/
 # training-derived map (dataset licence: not redistributed; ./run.sh rebuilds it)
 camloc/assets/vmap.npz
+camloc/assets/track_bounds.npz

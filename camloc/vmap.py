@@ -43,6 +43,15 @@ class VisualMap:
         self.cams = [str(c) for c in z['cams']]
         self.norm = bool(z['norm']) if 'norm' in z.files else False
         self.tree = cKDTree(self.kf_xy)
+        self.pt_kf = np.repeat(np.arange(len(self.kf_cam)), np.diff(self.kf_ptr))   # point -> keyframe
+        self._cam_pts = {}
+
+    def cam_points(self, cam):
+        """(point indices, descriptors) of every map point seen by `cam` (for global, prior-free search)."""
+        if cam not in self._cam_pts:
+            idx = np.flatnonzero(self.kf_cam[self.pt_kf] == self.cams.index(cam))
+            self._cam_pts[cam] = (idx, np.ascontiguousarray(self.D[idx]))
+        return self._cam_pts[cam]
 
     def candidates(self, cam, x, y, yaw, radius=40.0, max_dyaw=np.radians(35), max_kf=12):
         """Points of up to max_kf keyframes of `cam` within radius of (x, y) and similar heading."""
@@ -69,6 +78,7 @@ class MapLocalizer:
         # one detector / matcher per camera: OpenCV objects are not thread-safe, cameras run in parallel
         self.det = {c: orb() for c in self.masks}
         self.bf = {c: cv2.BFMatcher(cv2.NORM_HAMMING) for c in self.masks}
+        self.bf_global = {c: cv2.BFMatcher(cv2.NORM_HAMMING) for c in self.masks}
 
     def features(self, cam, gray_half):
         """ORB features (pose-independent, so they can be computed while the filter is still updating)."""
@@ -112,6 +122,30 @@ class MapLocalizer:
         return {'x': bx, 'y': by, 'yaw': byaw, 'n': int(len(inl)), 'rms_px': rms,
                 'median_depth': float(np.median(depth)),
                 'uv_in': (img[inl] / 2.0).astype(np.float32), 'P_in': obj[inl]}      # for map-point tracking
+
+    GLOBAL_TOPK = 8             # keyframes tried per camera in a global (prior-free) search
+
+    def global_localize(self, cam, gray_half, feats=None):
+        """TASK I: localise with NO pose prior. Vote over ALL map keyframes of `cam` with ratio-test descriptor
+        matches, then run the normal PnP localiser around each of the top-K keyframes. Returns a list of fixes."""
+        uv, des = feats if feats is not None else self.features(cam, gray_half)
+        if len(uv) < self.MIN_INLIERS:
+            return []
+        idx, D = self.vmap.cam_points(cam)
+        m = self.bf_global[cam].knnMatch(des, D, k=2)
+        good = [a.trainIdx for a, b in (p for p in m if len(p) == 2) if a.distance < 0.8 * b.distance and a.distance < 64]
+        if len(good) < self.MIN_INLIERS:
+            return []
+        votes = np.bincount(self.vmap.pt_kf[idx[good]], minlength=len(self.vmap.kf_cam))
+        out = []
+        for k in np.argsort(votes)[::-1][: self.GLOBAL_TOPK]:
+            if votes[k] < 6:
+                break
+            kx, ky = self.vmap.kf_xy[k]
+            r = self.localize(cam, gray_half, kx, ky, self.vmap.kf_yaw[k], 40.0, (uv, des))
+            if r is not None and np.hypot(r['x'] - kx, r['y'] - ky) < 40:
+                out.append(dict(r, cam=cam, kf=int(k), votes=int(votes[k])))
+        return out
 
     TRACK_FB_PX = 1.0           # LK forward-backward consistency (half-res px)
 

@@ -327,3 +327,27 @@ def test_scale_state_learns_a_wheel_speed_bias():
         f.predict(0.1, 20.0, 0.0)
         f.update_pose(x, 0.0, 0.0, 0.3, np.radians(0.2))
     assert abs(f.X[f.ik] - 0.03) < 0.005
+
+
+@needs_data
+def test_global_init_without_any_ground_truth_pose(tmp_path, monkeypatch):
+    """TASK I: the test file gives no starting pose. vismap must lock by itself; /tf map->base_link is never read."""
+    from camloc import run as R
+    vmap = C.ASSETS / 'vmap.npz'
+    if not vmap.exists():
+        pytest.skip('visual map not built (run.sh builds it)')
+
+    def no_gt(*a, **k):
+        raise AssertionError('initial_pose (GT /tf) must not be read at inference')
+    monkeypatch.setattr(R, 'initial_pose', no_gt)
+    stats = R.run(C.DEFAULT_MCAP, tmp_path / 'gi.csv', 'vismap', start_s=640, duration_s=3)
+    assert stats['estimator_stats']['global_init_locks'] == 1
+    assert stats['estimator_stats']['global_init_lock_t_s'] < 2.0
+    assert stats['poses'] == stats['frames']
+
+
+def test_twist_odometry_uses_velocity_and_sideslip():
+    from camloc.odometry import Odometry
+    o = Odometry(params={'q': {}}, source='wheels')
+    o.update(0, {'twist_vx': 30.0, 'twist_vy': 0.5, 'twist_wz': 0.1})
+    assert abs(o.v - np.hypot(30, 0.5)) < 1e-9 and o.wz == 0.1 and abs(o.beta_meas - np.arctan2(0.5, 30)) < 1e-12

@@ -18,6 +18,10 @@ STATE_TOPIC = '/constructor0/state_estimation'
 TF_TOPIC = '/tf'
 TF_STATIC_TOPIC = '/tf_static'
 BOUNDS_TOPIC = '/constructor0/track_bounds'
+# TASK I.0: the organisers' test-domain sample has no state_estimation / tf / track_bounds; it carries
+# validation/twist (TwistStamped, base_link) and validation/accel instead. Topics are also resolved by suffix.
+TWIST_TOPIC = '/constructor0/validation/twist'
+TWIST_FIELDS = ('twist_vx', 'twist_vy', 'twist_wz')   # field names of the StateEvents built from it
 BASE_FRAME = 'constructor0/base_link'
 
 # Car-state policy (REPORT.md section 5). Pose fields and anything computed from the pose are never exposed.
