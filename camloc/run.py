@@ -304,16 +304,42 @@ class VisualMapLoc(VisualHeading):
 
     def _global_hyps(self, gray, cams=None):
         cams = [c for c in (cams or self.MAP_CAMS) if c in gray]
-        res = self.pool.map(lambda c: self._seeded(self.loc.global_localize, c, gray[c]), cams)
+        if self.GI_LOG and not hasattr(self.loc, 'gi_diag'):
+            self.loc.gi_diag = {}
+        res = list(self.pool.map(lambda c: self._seeded(self.loc.global_localize, c, gray[c]), cams))
         hyps = []
         excl = getattr(self, '_excl_until', 0) > getattr(self, '_now', 0)
         for r in (h for hs in res for h in hs):
             if excl and np.hypot(r['x'] - self.ekf.X[0], r['y'] - self.ekf.X[1]) < self.EXCL_M:
                 continue
             lane, s_, n_ = self.track.locate(r['x'], r['y'], r['yaw'])[:3]
-            if self.track.lanes[str(lane[0])].inside(s_, n_, self.GI_LANE_MARGIN)[0]:
+            r['on_lane'] = bool(self.track.lanes[str(lane[0])].inside(s_, n_, self.GI_LANE_MARGIN)[0])
+            if r['on_lane']:
                 hyps.append(r)
+        if self.GI_LOG:
+            self._log_gi(cams, res)
         return hyps
+
+    GI_LOG = ''                           # DIAGNOSTIC (TASK L): CSV of every global-search candidate per frame
+    GI_LOG_S = 15.0                       # ... for the first GI_LOG_S seconds of searching
+
+    def _log_gi(self, cams, res):
+        t = getattr(self, '_now', 0)
+        if (t - getattr(self, '_t_first', t)) / 1e9 > self.GI_LOG_S:
+            return
+        if not hasattr(self, '_gilog'):
+            self._gilog = open(self.GI_LOG, 'w')
+            self._gilog.write('t_ns,el_s,cam,n_feat,n_good,top_votes,kf,votes,n_inl,rms_px,x,y,yaw,on_lane\n')
+        el = (t - getattr(self, '_t_first', t)) / 1e9
+        for c, hs in zip(cams, res):
+            d = self.loc.gi_diag.get(c, {})
+            tv = ' '.join(map(str, d.get('votes', [])))
+            if not hs:
+                self._gilog.write(f"{t},{el:.2f},{c},{d.get('feat', '')},{d.get('good', '')},{tv},,,,,,,,\n")
+            for h in hs:
+                self._gilog.write(f"{t},{el:.2f},{c},{d.get('feat', '')},{d.get('good', '')},{tv},{h['kf']},{h['votes']},"
+                                  f"{h['n']},{h['rms_px']:.2f},{h['x']:.2f},{h['y']:.2f},{h['yaw']:.4f},{int(h['on_lane'])}\n")
+        self._gilog.flush()
 
     def _try_lock(self, hyps, t, relaxed=False, relaxed_only=False):
         """Consensus lock from this frame's hypotheses and the recent history (propagated by odometry)."""

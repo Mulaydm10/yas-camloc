@@ -129,14 +129,18 @@ class MapLocalizer:
         """TASK I: localise with NO pose prior. Vote over ALL map keyframes of `cam` with ratio-test descriptor
         matches, then run the normal PnP localiser around each of the top-K keyframes. Returns a list of fixes."""
         uv, des = feats if feats is not None else self.features(cam, gray_half)
+        diag = self.gi_diag.setdefault(cam, {}) if hasattr(self, 'gi_diag') else {}   # DIAGNOSTIC (TASK L)
+        diag.update(feat=len(uv), good=0, votes=[])
         if len(uv) < self.MIN_INLIERS:
             return []
         idx, D = self.vmap.cam_points(cam)
         m = self.bf_global[cam].knnMatch(des, D, k=2)
         good = [a.trainIdx for a, b in (p for p in m if len(p) == 2) if a.distance < 0.8 * b.distance and a.distance < 64]
+        diag['good'] = len(good)
         if len(good) < self.MIN_INLIERS:
             return []
         votes = np.bincount(self.vmap.pt_kf[idx[good]], minlength=len(self.vmap.kf_cam))
+        diag['votes'] = np.sort(votes)[::-1][: self.GLOBAL_TOPK].tolist()
         out = []
         for k in np.argsort(votes)[::-1][: self.GLOBAL_TOPK]:
             if votes[k] < 6:
