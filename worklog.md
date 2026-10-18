@@ -65,3 +65,11 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - ADR-0003 accepted: the submitted variant is allowed-only `vismap`.
 - COMPETITION.md (LOCKED) filled from the challenge brief as Main Agent on the owner's instruction; audit row in GOVERNANCE.md. Deadline, dates, team size, roster and upload channel are not in the brief and stay TODO(<owner>).
 - notes/judging_alignment.md: every rubric criterion mapped to an artifact.
+
+## 2026-10-18 04:40 CEST - Claude (Opus, overnight in screen) - Devin tasks A-G (EXP-0025..0029)
+- Handshake with Devin on #2 (TASK/ACK/DONE); watcher re-armed every 30 min.
+- A: half-gain sideslip kept (pooled 0.586 m), later superseded. B: COMPETITION.md dates + host from the brief.
+- D: fix log shows S7 fixes present and unbiased; the filter under-corrects -> online sideslip states b + c*a_y with lateral Q. Found and fixed a --set bug (constructor parameters applied too late; regression test).
+- E: camera ~0.2-0.4 m higher above the paint than the map datum, but paint lateral scatter 0.44-0.74 m: closed.
+- F: phase-based axle choice; root cause of the strict lap 2 blow-up was locked front wheels under 42 bar braking with a front-axle fit. Strict pooled 0.513 m / 0.303 m / 95.1 %.
+- C: freeze pass from a clean clone (byte-identical map, 100 % coverage, 20.3 ms/frame). G: glare halves map success; extra blur for 45+ m/s nearly defeats ORB matching (open risk, mitigation proposed to Devin).
