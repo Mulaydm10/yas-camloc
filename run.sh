@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Single entry point: raw dataset -> submission CSV (timestamp_ns,x,y,yaw), causal.
+# Single entry point: raw dataset -> submission CSV (timestamp_ns,x,y,yaw,confidence,status), causal.
 #
 #   ./run.sh <test.mcap | test_dir> <out.csv> [training.mcap] [-- extra camloc.run options]
 #   e.g. ./run.sh test.mcap out.csv -- --init 12.3,-4.5,1.57      (first pose, if the test file has no /tf)

@@ -193,34 +193,34 @@ table.why .tag{font-size:16px}
 
 <!-- 6 LIMITS + RUN -->
 <section class="slide">
- <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Limits and reproducibility</span><span class="r">Sheet 6 / 6</span></div>
+ <div class="banner"><span><span class="dot"></span>camloc · Yas Marina</span><span>Failure cases and lessons</span><span class="r">Sheet 6 / 6</span></div>
  <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
  <div class="frame">
-  <div class="eyebrow">Engineering maturity</div>
+  <div class="eyebrow">Failure cases &amp; lessons learned</div>
   <h2>We know exactly <em>where it degrades</em>, and by how much.</h2>
   <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:26px;margin-top:28px">
    <div class="card" style="padding:26px 32px"><div class="label" style="margin-bottom:10px">Measured limits</div>
-    <table style="font-size:26px">
-     <tr><td style="padding:17px 14px">30 s / 60 s without map fixes</td><td class="n"><span class="tag warn">2.7 m</span> <span class="tag crit">5.2 m</span></td></tr>
-     <tr><td style="padding:17px 14px">Aliased start: time to correct</td><td class="n"><span class="tag warn">0.3–11 s</span></td></tr>
-     <tr><td style="padding:17px 14px">Daylight sample: accepted fixes</td><td class="n"><span class="tag warn">11 in 74 s</span></td></tr>
-     <tr><td style="padding:17px 14px">Lateral from paint (0.2 m height)</td><td class="n"><span class="tag crit">unobservable</span></td></tr>
-     <tr><td style="padding:17px 14px">Front exposure (blur small to ~60 m/s)</td><td class="n"><span class="tag ok">0.5–1 ms</span></td></tr>
+    <table style="font-size:22px">
+     <tr><td style="padding:9px 14px">30 s / 60 s without map fixes</td><td class="n"><span class="tag warn">2.7 m</span> <span class="tag crit">5.2 m</span></td></tr>
+     <tr><td style="padding:9px 14px">Aliased start: time to correct</td><td class="n"><span class="tag warn">0.3–11 s</span></td></tr>
+     <tr><td style="padding:9px 14px">Daylight sample: accepted fixes</td><td class="n"><span class="tag warn">11 in 74 s</span></td></tr>
+     <tr><td style="padding:9px 14px">Lateral from paint (0.2 m height)</td><td class="n"><span class="tag crit">unobservable</span></td></tr>
+     <tr><td style="padding:9px 14px">Front exposure (blur small to ~60 m/s)</td><td class="n"><span class="tag ok">0.5–1 ms</span></td></tr>
     </table>
-    <p style="font-size:21px;margin-top:18px">Blackouts: lap 4. The daylight sample has no GT: a structural check only (locks at 0.6 s, 74 / 74 one-second bins). Blur at 60 m/s is extrapolated.</p></div>
+    <div class="label" style="margin:22px 0 8px">Lessons learned</div><ol style="font:400 21px/1.4 'Source Serif 4',serif;color:var(--ink2);padding-left:26px;margin:0"><li style="margin:6px 0"><b style="color:var(--ink)">Strict hold-out is what makes the numbers trustworthy:</b> map and every calibration rebuilt without the scored lap (leakage ~0.02 m).</li><li style="margin:6px 0"><b style="color:var(--ink)">Check lock rules on test-domain data:</b> a pair-required lock passed every night test but never locked on the daylight sample; the fix was a provisional lock plus confirmation.</li><li style="margin:6px 0"><b style="color:var(--ink)">Map fixes, not odometry, decide accuracy:</b> 107 m alone, sub-metre with fixes.</li></ol></div>
    <div style="display:flex;flex-direction:column;gap:20px">
     <div class="card" style="background:var(--ink);border-color:var(--ink);padding:28px 32px">
      <div class="mono" style="font-size:36px;color:#F9F6EE">$ ./run.sh test.mcap out.csv</div>
      <div class="mono" style="font-size:17px;color:#B9B19E;margin-top:12px">No flags. Both topic layouts. Builds the venv and the visual map on first use.</div></div>
     <div class="card" style="padding:30px 32px"><ul style="columns:2;column-gap:30px">
-     <li style="font-size:27px;margin:14px 0">Strict leave-one-lap-out</li><li style="font-size:27px;margin:14px 0">Causal, image stamps only</li><li style="font-size:27px;margin:14px 0">GT pose never read</li><li style="font-size:27px;margin:14px 0">26 automated tests</li>
+     <li style="font-size:27px;margin:14px 0">Strict leave-one-lap-out</li><li style="font-size:27px;margin:14px 0">Causal, image stamps only</li><li style="font-size:27px;margin:14px 0">GT pose never read</li><li style="font-size:27px;margin:14px 0">27 automated tests</li>
      <li style="font-size:27px;margin:14px 0">Python 3.10–3.12, CPU</li><li style="font-size:27px;margin:14px 0">39 logged experiments</li></ul></div>
     <div style="display:flex;gap:16px;flex-wrap:wrap"><span class="pill blue" style="font-size:20px;padding:10px 20px">github.com/Mulaydm10/yas-camloc</span>
      <!-- TEAM LINE (edit here only) --></div><div class="card" style="padding:18px 28px"><div class="label">Team</div><div style="font:400 44px/1.1 'Instrument Serif',serif;color:var(--ink);margin-top:4px">Rogue <em style="color:var(--accent)">Ravens</em></div><div style="font:400 23px/1.4 'Source Serif 4',serif;color:var(--ink2);margin-top:6px">Tamo Schäfers · Dhruv Mulay · Gagan Karthik Sripuram · Taa-seen Ahmed</div></div>
    </div>
   </div>
  </div>
- <div class="scope"><b>Scope:</b> night training run with held-out laps, except the organisers' daylight sample (structural check, no ground truth, never used for tuning). <span class="mono">run.sh</span> with no flags was checked on the full training run and on a 60 s test-domain cut.</div>
+ <div class="scope"><b>Scope:</b> blackouts on lap 4; blur at 60 m/s extrapolated. Night training run with held-out laps, except the organisers' daylight sample (structural check, no ground truth, never used for tuning). <span class="mono">run.sh</span> with no flags was checked on the full training run and on a 60 s test-domain cut.</div>
 </section>
 
 </body>
