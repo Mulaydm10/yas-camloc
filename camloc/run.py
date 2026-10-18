@@ -307,7 +307,7 @@ class VisualMapLoc(VisualHeading):
             if self.QUALITY_W:
                 # per-fix sigma from its quality: fewer inliers / larger reprojection RMS -> less weight
                 q = np.array([np.sqrt(self.Q_REF_INL / max(f['n'], 1)) * max(1.0, f['rms_px'] / self.Q_REF_RMS)
-                              for f in use])
+                              * (1.0 + self.TRACK_AGE_INFL * f.get('age', 0)) for f in use])
                 w = 1 / q ** 2
                 mx, my = np.sum(w * [f['x'] for f in use]) / w.sum(), np.sum(w * [f['y'] for f in use]) / w.sum()
                 myaw = float(np.angle(np.sum(w * np.exp(1j * np.array([f['yaw'] for f in use])))))
@@ -373,6 +373,7 @@ class VisualMapLoc(VisualHeading):
     # TASK H.3 (EXP-0031): map-point tracking. When ORB matching fails, LK-track the last fix's inlier map points
     # for at most TRACK_MAX frames (each frame 0.1 s) and re-solve PnP. 0 = off.
     TRACK_MAX = 0
+    TRACK_AGE_INFL = 0.2     # tracked fix sigma grows by 20 % per frame of track age (LK drift accumulates)
 
     # STRESS TEST ONLY: with probability WRONG_FIX a camera's fix is shifted WRONG_FIX_M metres along the heading
     WRONG_FIX, WRONG_FIX_M = 0.0, 10.0
@@ -389,7 +390,9 @@ class VisualMapLoc(VisualHeading):
         if r is None and self.TRACK_MAX and t is not None and t[3] < self.TRACK_MAX:
             r = self.loc.track(c, t[0], g, t[1], t[2])
         if r is not None and self.TRACK_MAX:
-            self._trk[c] = (g, r['uv_in'], r['P_in'], (t[3] + 1) if (r.get('tracked') and t) else 0)
+            age = (t[3] + 1) if (r.get('tracked') and t) else 0
+            self._trk[c] = (g, r['uv_in'], r['P_in'], age)
+            r['age'] = age
         else:
             self._trk[c] = None
         return r
