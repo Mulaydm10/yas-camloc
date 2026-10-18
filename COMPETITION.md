@@ -33,7 +33,10 @@ Quantitative total 70 %, qualitative 30 %. Each quantitative metric is normalise
 ## Team roster
 | Name | Role | Contact | Notes |
 |---|---|---|---|
-| TODO(<owner>) | TODO(<owner>) | TODO(<owner>) | |
+| Tamo Schäfers | team Rogue Ravens | Discord team channel | |
+| Dhruv Mulay | team Rogue Ravens (repo owner) | GitHub Mulaydm10 | |
+| Gagan Karthik Sripuram | team Rogue Ravens | Discord team channel | |
+| Taa-seen Ahmed | team Rogue Ravens | Discord team channel | |
 
 ## Hard rules
 | Rule | Value |

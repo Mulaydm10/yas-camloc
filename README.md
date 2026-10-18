@@ -1,5 +1,7 @@
 # yas-camloc: camera-based localisation on the Yas Marina track
 
+**Team Rogue Ravens**: Tamo Schäfers, Dhruv Mulay, Gagan Karthik Sripuram, Taa-seen Ahmed.
+
 Constructor Labs challenge, National AI Hackathon 2026. A causal localiser estimates the race car's 2D pose
 (`x, y, yaw` of `constructor0/base_link` in `map`) at camera rate from its 7 cameras. It runs on CPU in real time.
 
