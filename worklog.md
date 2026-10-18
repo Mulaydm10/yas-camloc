@@ -85,3 +85,7 @@ Format: `## YYYY-MM-DD HH:MM TZ - author - summary`, then bullets citing IDs.
 - H.2: blackout regression traced (+6 % whole run; lap 4 window = phase-odometry trade-off). Gated reset, corner bounds, online wheel scale and DCS soft gate tested on strict folds + blackouts + wrong-fix injection: none passes.
 - H.3: LK map-point tracking (age-scaled sigma) rejected; full-pipeline glare costs lap 4 0.46 -> 1.12 m.
 - Defaults unchanged since f49ab7f; all options default-off and documented.
+
+## 2026-10-18 13:40 CEST - Claude (Opus, screen session 57650) - duplicate-session cleanup
+- A forked duplicate session (screen 68230) had worked TASK H in parallel on the same working tree (commits 280a091, 79c87e2; "DONE H.2" on #2 at 06:18 UTC). Peer session national-18 closed it on the owner's instruction; this session is now the only one working with Devin.
+- Its EXP-0032 row duplicated an ID; renumbered to EXP-0035 with a provenance note (content overlaps EXP-0032/0033). No code conflict: the history is linear, and defaults are unchanged since f49ab7f.
