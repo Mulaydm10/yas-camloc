@@ -30,7 +30,9 @@ if [ ! -x .venv/bin/python ]; then
       if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then PYB=$c; break; fi
     done
     [ -n "$PYB" ] || { echo "run.sh: need Python >= 3.10 (or uv) to create .venv" >&2; exit 1; }
-    "$PYB" -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -r requirements.txt
+    REQ=requirements.txt                 # exact pins are for Python 3.12; other versions get version ranges
+    "$PYB" -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' || REQ=requirements-compat.txt
+    "$PYB" -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -r "$REQ"
   fi
   [ -x .venv/bin/python ] || { echo "run.sh: creating .venv failed" >&2; exit 1; }
 fi
