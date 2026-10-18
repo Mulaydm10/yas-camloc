@@ -20,11 +20,14 @@ class PoseEKF:
     is heading + beta + b + c * a_y. q_lat (m per sqrt(m)) adds lateral process noise scaled with distance."""
     N = 4
 
-    def __init__(self, x, y, yaw, q, p0=(0.05, 0.05, np.radians(0.5)), slip=None):
+    def __init__(self, x, y, yaw, q, p0=(0.05, 0.05, np.radians(0.5)), slip=None, scale=None):
         self.slip = slip
         self.nc = 1 if slip and slip.get('c_sigma0') else 0
-        self.N = 4 + (1 + self.nc if slip else 0)
+        self.scale = scale              # optional wheel-speed scale state k: travel speed = v * (1 + k) (TASK H.2)
+        self.ik = 4 + (1 + self.nc if slip else 0)
+        self.N = self.ik + (1 if scale else 0)
         extra = ([slip['sigma0']] + ([slip['c_sigma0']] if self.nc else [])) if slip else []
+        extra += [scale['sigma0']] if scale else []
         self.X = np.array([x, y, yaw, yaw] + [0.0] * len(extra), float)
         self.P = np.diag(np.square([*p0, p0[2]] + extra))
         self.q_lat = 0.0
@@ -50,6 +53,9 @@ class PoseEKF:
             return
         x, y, h = self.X[:3]
         ay = v * wz
+        v_in = v
+        if self.scale:
+            v = v * (1.0 + self.X[self.ik])
         hm = h + 0.5 * wz * dt + beta
         if self.slip:
             hm += self.X[4] + (self.X[5] * ay if self.nc else 0.0)
@@ -71,6 +77,11 @@ class PoseEKF:
                 F[0, 5], F[1, 5], F[5, 5] = -v * s * dt * ay, v * c * dt * ay, a
                 self.X[5] *= a
                 Q[5, 5] += self.slip['c_q'] ** 2 * dt
+        if self.scale:
+            a = np.exp(-dt / self.scale['tau'])
+            F[0, self.ik], F[1, self.ik], F[self.ik, self.ik] = v_in * c * dt, v_in * s * dt, a
+            self.X[self.ik] *= a
+            Q[self.ik, self.ik] += self.scale['q'] ** 2 * dt
         if self.q_lat:
             n = np.array([-s, c])
             Q[:2, :2] += np.outer(n, n) * self.q_lat ** 2 * abs(v) * dt
@@ -125,6 +136,8 @@ class PoseEKF:
         return float(r @ np.linalg.solve(S, r))
 
     def _clip_slip(self):
+        if self.scale and self.scale.get('clip'):
+            self.X[self.ik] = np.clip(self.X[self.ik], -self.scale['clip'], self.scale['clip'])
         if self.slip:
             if self.slip.get('clip'):
                 self.X[4] = np.clip(self.X[4], -self.slip['clip'], self.slip['clip'])
@@ -135,20 +148,24 @@ class PoseEKF:
         """Visual rotation since the keyframe: z = yaw - yaw_kf."""
         return self.update(dyaw_meas, wrap(self.X[2] - self.X[3]), self._row(0, 0, 1.0, -1.0), sigma ** 2, angle=True)
 
-    def constrain_to_lane(self, track, margin=0.75, sigma=0.3, sigma_h=np.radians(2), gate_h=np.radians(10), lane_name=None):
+    def constrain_to_lane(self, track, margin=0.75, sigma=0.3, sigma_h=np.radians(2), gate_h=np.radians(10), lane_name=None,
+                          corners=False):
         """Map priors on STRAIGHTS only (Lane.straight: |curvature| < 1/500 within +-100 m), where they do
         not depend on the along-track position s, so an s error cannot turn them into wrong corrections:
           heading: epsi ~ N(0, 2 deg)   (training GT on straights: |epsi| p95 1.6, max 5.3 deg); gated at 10 deg
           lateral: car centre within the lane borders + 0.75 m (training GT: max excess 0.5 m)
-        In corners nothing is applied. Returns (lane name, applied?)."""
+        In corners nothing is applied, unless corners=True (TASK H.2): then the LATERAL bound (distance to the nearest
+        centreline point, which does not depend on the along-track estimate) is applied there too, never the heading
+        prior. Returns (lane name, applied?)."""
         if lane_name is None:
             lane_name = str(track.locate(self.X[0], self.X[1], self.X[2])[0][0])
         name = lane_name
         lane = track.lanes[name]
         s, n, e = lane.project(self.X[0], self.X[1], self.X[2])
-        if not lane.straight_at(s)[0]:
+        straight = bool(lane.straight_at(s)[0])
+        if not straight and not corners:
             return name, False
-        if abs(e[0]) < gate_h:
+        if straight and abs(e[0]) < gate_h:
             self.update_heading(lane, 0.0, sigma_h)
         s, n = lane.project(self.X[0], self.X[1], self.X[2])[:2]
         wl, wr = lane.width_at(s)

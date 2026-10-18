@@ -93,7 +93,13 @@ class MapLocalizer:
         if not ok or inl is None or len(inl) < self.MIN_INLIERS:
             return None
         inl = inl.ravel()
-        rvec, tvec = cv2.solvePnPRefineLM(obj[inl], img[inl].astype(np.float64), c.K, c.D, rvec, tvec)
+        return self._pose(cam, obj[inl], img[inl].astype(np.float64), rvec, tvec)
+
+    def _pose(self, cam, obj, img, rvec, tvec):
+        """LM-refine a PnP solution on its inliers (obj map points, img full-res px) -> base_link fix."""
+        c = self.cams[cam]
+        inl = np.arange(len(obj))
+        rvec, tvec = cv2.solvePnPRefineLM(obj, img, c.K, c.D, rvec, tvec)
         R, _ = cv2.Rodrigues(rvec)
         T_cam_map = np.eye(4)
         T_cam_map[:3, :3], T_cam_map[:3, 3] = R, tvec.ravel()
@@ -104,4 +110,32 @@ class MapLocalizer:
         rms = float(np.sqrt(np.mean(np.sum((proj.reshape(-1, 2) - img[inl]) ** 2, axis=1))))
         depth = (R @ obj[inl].T + tvec).T[:, 2]
         return {'x': bx, 'y': by, 'yaw': byaw, 'n': int(len(inl)), 'rms_px': rms,
-                'median_depth': float(np.median(depth))}
+                'median_depth': float(np.median(depth)),
+                'uv_in': (img[inl] / 2.0).astype(np.float32), 'P_in': obj[inl]}      # for map-point tracking
+
+    TRACK_FB_PX = 1.0           # LK forward-backward consistency (half-res px)
+
+    def track(self, cam, prev_gray, gray, uv_prev, P):
+        """TASK H.3: follow the last fix's inlier map points into `gray` with pyramidal LK and re-solve PnP with
+        the SAME 3D points. Works when fresh ORB detection fails under blur (LK matches whole patches)."""
+        if uv_prev is None or len(uv_prev) < self.MIN_INLIERS:
+            return None
+        p0 = uv_prev.reshape(-1, 1, 2)
+        p1, st, _ = cv2.calcOpticalFlowPyrLK(prev_gray, gray, p0, None, winSize=(21, 21), maxLevel=4)
+        if p1 is None:
+            return None
+        pb, stb, _ = cv2.calcOpticalFlowPyrLK(gray, prev_gray, p1, None, winSize=(21, 21), maxLevel=4)
+        ok = (st.ravel() == 1) & (stb.ravel() == 1) & (np.linalg.norm((pb - p0).reshape(-1, 2), axis=1) < self.TRACK_FB_PX)
+        if ok.sum() < self.MIN_INLIERS:
+            return None
+        img = p1.reshape(-1, 2)[ok].astype(np.float64) * 2.0
+        obj = P[ok].astype(np.float64)
+        c = self.cams[cam]
+        good, rvec, tvec, inl = cv2.solvePnPRansac(obj, img, c.K, c.D, iterationsCount=100, reprojectionError=4.0,
+                                                   confidence=0.999, flags=cv2.SOLVEPNP_EPNP)
+        if not good or inl is None or len(inl) < self.MIN_INLIERS:
+            return None
+        inl = inl.ravel()
+        r = self._pose(cam, obj[inl], img[inl], rvec, tvec)
+        r['tracked'] = True
+        return r

@@ -57,6 +57,9 @@ class OdomEstimator(Estimator):
     # defaults (EXP-0026): b + c * a_y, tau 60 s, steady-state sigma 0.3 deg / 0.15 deg per m/s^2, clips 1 / 0.3
     SLIP_STATE, SLIP_SIGMA0_DEG, SLIP_Q_DEG, SLIP_TAU_S, SLIP_CLIP_DEG = 2, 0.3, 0.055, 60.0, 1.0
     SLIP_C_SIGMA0_DEG, SLIP_C_Q_DEG, SLIP_C_CLIP_DEG, Q_LAT = 0.15, 0.027, 0.3, 0.03
+    # TASK H.2 (EXP-0032): online wheel-speed scale k (travel speed = v (1 + k)); tyre radius varies with temperature,
+    # pressure and speed. sigma0 / steady-state ~1 %, tau 120 s, clip +-5 %
+    SCALE_STATE, SCALE_SIGMA0, SCALE_Q, SCALE_TAU_S, SCALE_CLIP = 0, 0.01, 0.0013, 120.0, 0.05
     BETA0_GAIN, BETA1_GAIN = 0.0, 0.0     # fixed GT-fitted gains replaced by the online slip states (EXP-0025 -> EXP-0026)
 
     def __init__(self, init, cameras, track):
@@ -69,7 +72,9 @@ class OdomEstimator(Estimator):
             if self.SLIP_STATE >= 2:     # Devin's refinement: b + c * a_y
                 slip.update({'c_sigma0': np.radians(self.SLIP_C_SIGMA0_DEG), 'c_q': np.radians(self.SLIP_C_Q_DEG),
                              'c_clip': np.radians(self.SLIP_C_CLIP_DEG)})
-        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'], slip=slip)
+        scale = ({'sigma0': self.SCALE_SIGMA0, 'q': self.SCALE_Q, 'tau': self.SCALE_TAU_S, 'clip': self.SCALE_CLIP}
+                 if self.SCALE_STATE else None)
+        self.ekf = PoseEKF(self.x, self.y, self.yaw, self.odo.p['q'], slip=slip, scale=scale)
         self.ekf.q_lat = self.Q_LAT
         self.t = self.t0
 
@@ -130,6 +135,7 @@ class VisualHeading(OdomBounds):
         scales = json.loads((C.ASSETS / 'vis_rot_scale.json').read_text())
         self.scale = {c: scales.get(c, 1.0) for c in self.VIS_CAMS}
         self.kf_t = None
+        self._cams = cameras
         # per-camera OpenCV work runs in threads (OpenCV releases the GIL); results do not depend on threading
         # because each job seeds OpenCV's (thread-local) RANSAC generator itself
         self.pool = ThreadPoolExecutor(max_workers=6)
@@ -138,12 +144,23 @@ class VisualHeading(OdomBounds):
         self.stats = {'updates': 0, 'rejected': 0, 'keyframes': 0, 'lane_switches': 0}
 
     DECODE_CAMS = VIS_CAMS
+    AUG = ''                 # STRESS TEST ONLY: camloc.augment name applied to every decoded image (e.g. speed45)
 
     def _gray(self, fs):
         """Half-resolution grayscale images of DECODE_CAMS, decoded once per frame set, in parallel."""
         if self._gray_for is not fs:
             cams = [c for c in self.DECODE_CAMS if c in fs.images]
             dec = lambda c: self.cv2.imdecode(np.frombuffer(fs.images[c], np.uint8), self.cv2.IMREAD_REDUCED_GRAYSCALE_2)
+            if self.AUG.startswith('phys'):               # stress test only: physical flow-field blur (TASK H)
+                from .augment import flow_blur                # physS:E = extra blur of driving S x faster, exposure E ms
+                scale, exp_ms = map(float, self.AUG[4:].split(':'))
+                dec0, v, wz = dec, self.odo.v, self.odo.wz
+                dec = lambda c: flow_blur(dec0(c), self._cams[c], (scale - 1) * v, (scale - 1) * wz, exp_ms / 1e3,
+                                          self._cams[c].T_base_cam[2, 3] + 0.3)
+            elif self.AUG:                                # stress test only: degrade every query image
+                from .augment import augment
+                dec0 = dec
+                dec = lambda c: augment(dec0(c), self.AUG)
             self._gray_cache, self._gray_for = dict(zip(cams, self.pool.map(dec, cams))), fs
         return self._gray_cache
 
@@ -179,11 +196,13 @@ class VisualHeading(OdomBounds):
         if self.bounds:
             self._update_lane()
             if self.priors_active(fs.stamp_ns):
-                self.ekf.constrain_to_lane(self.track, lane_name=self.lane)
+                self.ekf.constrain_to_lane(self.track, lane_name=self.lane, corners=bool(self.BOUNDS_CORNERS))
         return self.ekf.pose
 
     def priors_active(self, t_ns):
         return True
+
+    BOUNDS_CORNERS = 0       # TASK H.2: also apply the lateral track bound in corners when priors are active
 
     PIT_SPEED = 12.0        # m/s; the training run drives the pit lane at a limiter-like 8 m/s, the track at 20-40
     PIT_HOLD_S = 2.0
@@ -271,7 +290,7 @@ class VisualMapLoc(VisualHeading):
         feats = {c: f.result() for c, f in feats.items()}
         if self._fix_dropped(fs.stamp_ns):
             cams = []
-        res = self.pool.map(lambda c: self._seeded(self.loc.localize, c, gray[c], x, y, yaw, radius, feats[c]), cams)
+        res = self.pool.map(lambda c: self._seeded(self._cam_fix, c, gray[c], x, y, yaw, radius, feats[c]), cams)
         res = [dict(r, cam=c) for c, r in zip(cams, res) if r is not None]
         fixes = [r for r in res if abs(np.angle(np.exp(1j * (r['yaw'] - yaw)))) < np.radians(10)]
         use, nis, used0 = [], float('nan'), []
@@ -310,8 +329,19 @@ class VisualMapLoc(VisualHeading):
                 self.n_cons_reject += 1
             elif nis <= self.NIS_GATE:
                 self.n_cons_reject = 0
-            reset = self.n_reject >= self.REJECT_RESET or (self.CONSENSUS_RESET and self.n_cons_reject >= self.CONSENSUS_RESET)
-            if nis > self.NIS_GATE and not reset:
+            sd_pos = float(np.sqrt(self.ekf.P[0, 0] + self.ekf.P[1, 1]))
+            reset = self.n_reject >= self.REJECT_RESET or (self.CONSENSUS_RESET and self.n_cons_reject >= self.CONSENSUS_RESET
+                                                           and sd_pos > self.RESET_MIN_SD)
+            if self.GATE_MODE == 'dcs':
+                # dynamic covariance scaling (Agarwal et al., ICRA 2013): never reject, down-weight by NIS
+                sc = min(1.0, 2 * self.DCS_PHI / (self.DCS_PHI + nis))
+                sxy, syaw = sxy / sc, syaw / sc
+                self.n_reject = self.n_cons_reject = 0
+                self.ekf.update_pose(mx, my, myaw, sxy, syaw)
+                self.stats['map_fixes'] += 1
+                if sc > 0.5:
+                    self.last_fix_t = fs.stamp_ns
+            elif nis > self.NIS_GATE and not reset:
                 self.n_reject += 1
                 use = []
             else:
@@ -327,7 +357,42 @@ class VisualMapLoc(VisualHeading):
         self.stats['map_rejected'] += len(fixes) - len(use)
         if self.FIX_LOG:
             self._log_fixes(fs.stamp_ns, x, y, yaw, res, fixes, used0, use, nis)
+        if self.STATE_LOG:                    # DIAGNOSTIC: learned online states per frame (k, slip b, c)
+            if not hasattr(self, '_statelog'):
+                self._statelog = open(self.STATE_LOG, 'w')
+                self._statelog.write('t_ns,v,k,b_deg,c_deg_per_mps2,fix\n')
+            X = self.ekf.X
+            k = X[self.ekf.ik] if self.ekf.scale else 0.0
+            b = np.degrees(X[4]) if self.ekf.slip else 0.0
+            cc = np.degrees(X[5]) if self.ekf.nc else 0.0
+            self._statelog.write(f'{fs.stamp_ns},{self.odo.v:.3f},{k:.5f},{b:.4f},{cc:.5f},{int(bool(use))}\n')
         return self.ekf.pose
+
+    STATE_LOG = ''
+
+    # TASK H.3 (EXP-0031): map-point tracking. When ORB matching fails, LK-track the last fix's inlier map points
+    # for at most TRACK_MAX frames (each frame 0.1 s) and re-solve PnP. 0 = off.
+    TRACK_MAX = 0
+
+    # STRESS TEST ONLY: with probability WRONG_FIX a camera's fix is shifted WRONG_FIX_M metres along the heading
+    WRONG_FIX, WRONG_FIX_M = 0.0, 10.0
+
+    def _cam_fix(self, c, g, x, y, yaw, radius, feats):
+        r = self.loc.localize(c, g, x, y, yaw, radius, feats)
+        if r is not None and self.WRONG_FIX:
+            u = np.random.default_rng((self.MAP_CAMS.index(c) * 1000003 + int(abs(x) * 100) * 31 + int(abs(y) * 100)) % 2**32).random()
+            if u < self.WRONG_FIX:
+                r = dict(r, x=r['x'] + self.WRONG_FIX_M * np.cos(yaw), y=r['y'] + self.WRONG_FIX_M * np.sin(yaw))
+        if not hasattr(self, '_trk'):
+            self._trk = {}
+        t = self._trk.get(c)
+        if r is None and self.TRACK_MAX and t is not None and t[3] < self.TRACK_MAX:
+            r = self.loc.track(c, t[0], g, t[1], t[2])
+        if r is not None and self.TRACK_MAX:
+            self._trk[c] = (g, r['uv_in'], r['P_in'], (t[3] + 1) if (r.get('tracked') and t) else 0)
+        else:
+            self._trk[c] = None
+        return r
 
     # DIAGNOSTIC (default off): per-frame log of every camera's PnP result and what happened to it (EXP-0025, TASK D)
     FIX_LOG = ''
@@ -357,6 +422,8 @@ class VisualMapLoc(VisualHeading):
 
     # fix quality weighting (EXP-0021): sigma_i = SIGMA_XY * sqrt(Q_REF_INL / inliers) * max(1, rms / Q_REF_RMS)
     QUALITY_W, Q_REF_INL, Q_REF_RMS = 1, 40.0, 1.5     # on: pooled held-out 0.673 -> 0.630 m, lateral 0.495 -> 0.477
+    GATE_MODE, DCS_PHI = 'hard', 6.0   # TASK H.2 (EXP-0033): 'dcs' = soft gate (covariance scaling) instead of NIS reject
+    RESET_MIN_SD = 0.0       # TASK H.2: consensus reset only when the filter's position sigma exceeds this (m)
     CONSENSUS_RESET = 0      # >= 2 agreeing cameras NIS-rejected N frames in a row -> reset; 3 caused false resets (EXP-0028), off
     NIS_GATE = 13.8          # chi2(2 dof) 99.9 %
     REJECT_RESET = 15        # consecutive rejected fixes -> trust the map again

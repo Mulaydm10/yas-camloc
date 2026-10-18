@@ -132,13 +132,18 @@ Spatial changes, which CLAHE cannot undo (TASK G, CLAHE map, success rate per ca
 | saturated sky (top 25 % white) | 33 % | 76 % | 44 % |
 | cast shadow band | 20 % | 64 % | 36 % |
 | floodlight glare (3 blobs) | 15 % | 34 % | 20 % |
-| extra blur for 30 m/s | 11 % | 37 % | 13 % |
-| extra blur for 45 m/s | 0 % | 7 % | 1 % |
-| extra blur for 60 m/s | 0 % | 0.5 % | 0 % |
+| "blur for 30 m/s" (V/3 px model: worst case, unphysical, 13–25× too strong) | 11 % | 37 % | 13 % |
+| "blur for 45 m/s" (same, worst case) | 0 % | 7 % | 1 % |
+| "blur for 60 m/s" (same, worst case) | 0 % | 0.5 % | 0 % |
 
 - The blur is added on top of the blur already in the night images, so it is pessimistic.
-- Even so, **much higher speed than training is the largest open risk**: map matching then mostly fails, and
-  accuracy falls to the blackout regime above (2–5 m).
+- **Measured afterwards (EXP-0030, EXP-0031):** the real images show no measurable blur growth with speed.
+  A physical flow-field blur model (exposure × image motion from speed, yaw rate, camera geometry and
+  ground-plane depth) fitted to the real sharpness gives an exposure of **about 0.5–1 ms for the front
+  cameras**. That is an extrapolation from night data; daylight auto-exposure is normally shorter. At 60 m/s
+  this predicts under 10 % sharpness loss, so the "V/3 px" rows above are an unphysical worst case.
+- The open risk is therefore **not** speed blur but **anything that removes map fixes** (local glare halves
+  them). The fallback then gives 2–5 m (blackout table above).
 
 **Losing map fixes.** These are switches for testing only (`--set FIX_DROP=…` / `FIX_GAP_S=… FIX_PERIOD_S=…`):
 

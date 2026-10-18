@@ -61,7 +61,7 @@ def test_inference_modules_do_not_import_groundtruth():
     pkg = Path(__file__).resolve().parent.parent / 'camloc'
     eval_only = {'groundtruth.py', 'evaluate.py',                                     # evaluation only
                  'calibrate_odometry.py', 'calibrate_cameras.py', 'overlay_borders.py',   # training-time only
-                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py', 'plot_traj.py', 'holdout.py', 'fit_camera_height.py'}
+                 'fit_road_attitude.py', 'vo_rotation_check.py', 'lateral_sensitivity.py', 'vis_heading_check.py', 'build_map.py', 'vmap_check.py', 'plot_traj.py', 'holdout.py', 'fit_camera_height.py', 'blur_vs_speed.py', 'exposure_fit.py'}
     for f in pkg.rglob('*.py'):
         if f.name in eval_only:
             continue
@@ -315,3 +315,15 @@ def test_overrides_reach_the_constructor(tmp_path):
     finally:
         R.PoseEKF.__init__ = orig
     assert seen['slip'] is not None
+
+
+def test_scale_state_learns_a_wheel_speed_bias():
+    from camloc.filter import PoseEKF
+    q = {'sigma_v_frac': 0.02, 'sigma_wz': 0.005, 'sigma_v_abs': 0.1}
+    f = PoseEKF(0, 0, 0, q, scale={'sigma0': 0.02, 'q': 1e-4, 'tau': 1e6, 'clip': 0.1})
+    x = 0.0
+    for _ in range(300):
+        x += 20.0 * 1.03 * 0.1          # true speed 3 % above the wheel speed
+        f.predict(0.1, 20.0, 0.0)
+        f.update_pose(x, 0.0, 0.0, 0.3, np.radians(0.2))
+    assert abs(f.X[f.ik] - 0.03) < 0.005
