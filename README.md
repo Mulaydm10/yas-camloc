@@ -329,3 +329,8 @@ are only a proxy for it.
 | `tests/` | `pytest -q tests` |
 
 Agent and team workflow files: `CLAUDE.md`, `STATE.md`, `worklog.md`, `AGENTS.md`, `GOVERNANCE.md`.
+
+## Archived data
+
+`data/` (14 GB) is not in git and was removed locally to save disk. It is on Google Drive at `Dhruv-archive/camloc/data`.
+Restore: `rclone copy gdrive:Dhruv-archive/camloc/data data`. The Python venv is rebuilt automatically by `run.sh` from `requirements.txt`.
